@@ -75,11 +75,18 @@ type SensorGroup = "thermal" | "dga" | "equipment" | "diagnostic";
 
 ### 1.3 Status Enums
 
+> ⚠️ **Two separate status systems exist — do not confuse them:**
+> - `SensorStatus` (4 levels) is used for **individual sensor readings** and **health components**.
+> - `AlertSeverity` (3 levels) is used only for **alert messages**. It has no CAUTION level.
+> Use `SensorStatus` everywhere except the `severity` field of an `alert` object.
+
 ```typescript
 // Sensor and component health status — 4 levels
+// Used in: SensorReading.status, HealthComponentStatus.status, anomaly thresholds
 type SensorStatus = "NORMAL" | "CAUTION" | "WARNING" | "CRITICAL";
 
-// Alert severity — 3 levels
+// Alert severity — 3 levels (no CAUTION — alerts are only raised at WARNING or above)
+// Used in: Alert.severity only
 type AlertSeverity = "INFO" | "WARNING" | "CRITICAL";
 
 // Alert source — identifies which engine generated the alert
@@ -372,8 +379,18 @@ Sent on every thermal tick (every 5 sim-seconds) while a non-`normal` scenario i
 | scenario_id | ScenarioId | |
 | name | string | Human-readable scenario name |
 | stage | string | Current stage description |
-| progress_percent | number | 0.0–100.0 |
+| progress_percent | number | 0.0–100.0. Computed as `elapsed_sim_time / total_duration_sim_s × 100`. |
 | elapsed_sim_time | number | Seconds since scenario was triggered |
+| total_duration_sim_s | number | Total scenario duration in sim-seconds (fixed per scenario, see table below) |
+
+**Scenario durations (sim-seconds). Used by frontend for progress bar and ETA display:**
+
+| scenario_id | total_duration_sim_s | Human duration at 1× |
+|-------------|---------------------|----------------------|
+| `hot_spot` | 7200 | 2 hours |
+| `arcing` | 900 | 15 minutes |
+| `cooling_failure` | 3600 | 1 hour |
+| `normal` | — | Does not send `scenario_update` |
 
 ---
 

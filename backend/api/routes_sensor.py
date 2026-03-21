@@ -69,6 +69,61 @@ async def get_sensors_current(request: Request) -> SensorsCurrentResponseSchema:
     )
 
 
+@router.get("/sensors/snapshot", response_model=SensorsCurrentResponseSchema)
+async def get_sensors_snapshot(
+    sim_time: float = Query(..., description="Simulation time (seconds). Returns closest reading at or before this value."),
+) -> SensorsCurrentResponseSchema:
+    """Return the closest reading at or before sim_time for all 21 sensors.
+
+    Args:
+        sim_time: Upper bound on simulation seconds (inclusive).
+
+    Returns:
+        SensorsCurrentResponseSchema with timestamp, sim_time, and all sensors.
+
+    Raises:
+        HTTPException 404: If no sensor data exists at or before the given sim_time.
+    """
+    rows = await queries.get_sensor_snapshot(sim_time)
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No sensor data found at or before sim_time={sim_time}",
+        )
+
+    # Index rows by sensor_id for O(1) lookup
+    row_by_sensor: dict[str, dict] = {row["sensor_id"]: row for row in rows}
+
+    # Use the maximum sim_time among returned rows as the response sim_time,
+    # and the corresponding timestamp as the response timestamp.
+    latest_row = max(rows, key=lambda r: r["sim_time"])
+    response_timestamp: str = latest_row["timestamp"]
+    response_sim_time: float = latest_row["sim_time"]
+
+    sensors: dict[str, SensorReadingSchema] = {}
+    for sid in ALL_SENSOR_IDS:
+        row = row_by_sensor.get(sid)
+        if row is not None:
+            sensors[sid] = SensorReadingSchema(
+                value=float(row["value"]),
+                unit=SENSOR_UNITS.get(sid, ""),
+                status=str(row["status"]),
+            )
+        else:
+            # Sensor has no reading at or before sim_time — use a zero placeholder
+            sensors[sid] = SensorReadingSchema(
+                value=0.0,
+                unit=SENSOR_UNITS.get(sid, ""),
+                status="UNKNOWN",
+            )
+
+    return SensorsCurrentResponseSchema(
+        timestamp=response_timestamp,
+        sim_time=response_sim_time,
+        sensors=sensors,
+    )
+
+
 @router.get("/sensors/history", response_model=SensorHistoryResponseSchema)
 async def get_sensor_history(
     sensor_id: str = Query(..., description="Canonical SensorId"),

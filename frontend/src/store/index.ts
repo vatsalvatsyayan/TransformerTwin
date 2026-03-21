@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import type { SensorId, SensorReadings, SensorHistoryPoint } from '../types/sensors'
 import type { Alert } from '../types/alerts'
 import type { HealthComponentDetail, HealthComponentKey, HealthStatusLabel } from '../types/health'
-import type { DGAAnalysisResponse } from '../types/dga'
+import type { DGAAnalysisResponse, DuvalResult } from '../types/dga'
 import type { FMEAResponse } from '../types/fmea'
 import type { ScenarioId } from '../types/scenario'
 import type { ConnectionState } from '../types/websocket'
@@ -33,6 +33,7 @@ export interface AppState {
 
   // --- DGA ---
   analysis: DGAAnalysisResponse | null
+  duvalHistory: DuvalResult[]
 
   // --- FMEA ---
   response: FMEAResponse | null
@@ -103,6 +104,7 @@ export const useStore = create<AppState>()((set) => ({
   activeCount: 0,
   totalCount: 0,
   analysis: null,
+  duvalHistory: [],
   response: null,
   activeScenario: 'normal',
   scenarioName: 'Normal Operation',
@@ -181,7 +183,12 @@ export const useStore = create<AppState>()((set) => ({
     })
   },
 
-  setDGAAnalysis: (analysis) => set({ analysis }),
+  setDGAAnalysis: (analysis) =>
+    set((state) => {
+      if (!analysis.duval || analysis.duval.zone === 'NONE') return { analysis }
+      const trail = [...state.duvalHistory, analysis.duval].slice(-20)
+      return { analysis, duvalHistory: trail }
+    }),
   setFMEAResponse: (response) => set({ response }),
 
   updateScenario: (p) =>

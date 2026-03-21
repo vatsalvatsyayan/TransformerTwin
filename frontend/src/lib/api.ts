@@ -8,7 +8,7 @@ import type { ScenarioStatusResponse, ScenarioTriggerResponse } from '../types/s
 import type { SimulationRequest, SimulationResponse } from '../types/simulation'
 import type { SensorId } from '../types/sensors'
 
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = 'http://localhost:8001'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -83,4 +83,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ speed_multiplier: multiplier }),
     }),
+
+  /** Return all sensor readings closest to (at or before) the given sim_time. */
+  getSensorsSnapshot: (simTime: number) =>
+    request<{ timestamp: string; sim_time: number; sensors: Record<string, unknown> }>(
+      `/api/sensors/snapshot?sim_time=${simTime}`,
+    ),
 }

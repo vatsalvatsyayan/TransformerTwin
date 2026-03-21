@@ -5,7 +5,7 @@
 
 ---
 
-## Current Status: 🟡 Phase 2 Complete — Ready for Phase 3 Frontend Integration
+## Current Status: 🟡 Phase 4 In Progress — Duval Triangle + Playback Complete, Integration Test Remaining
 
 All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing.
 
@@ -209,17 +209,19 @@ Target: Charts + Duval Triangle + Alerts + Simulation + Playback
 > The ternary→Cartesian formula and all zone polygon vertices are defined there.
 
 - [x] **4.1** Time-series charts skeleton — `SensorLineChart.tsx` with threshold reference lines
-- [x] **4.2** Duval Triangle visualization (SVG) — `DuvalTriangle.tsx` skeleton with point
-  - [ ] **4.2a** Implement zone polygons in `lib/duvalGeometry.ts` using vertices from `docs/DUVAL_TRIANGLE_VERTICES.md`
-  - [ ] **4.2b** Implement ternary→Cartesian coordinate transform
-  - [ ] **4.2c** Render live CH4/C2H4/C2H2 point + historical trail
+- [x] **4.2** Duval Triangle visualization (SVG) — `DuvalTriangle.tsx` fully implemented
+  - [x] **4.2a** Zone polygons in `lib/duvalGeometry.ts` — all 7 zones with normalized Cartesian vertices from `docs/DUVAL_TRIANGLE_VERTICES.md`
+  - [x] **4.2b** Ternary→Cartesian coordinate transform — correct IEC 60599 formula (CH4→BL, C2H4→BR, C2H2→Top)
+  - [x] **4.2c** Live CH4/C2H4/C2H2 point + historical trail (last 20 readings, fading opacity)
 - [x] **4.3** Alert/diagnostics panel — `AlertPanel.tsx` with acknowledge button
 - [x] **4.4** FMEA diagnostic cards — `FMEACard.tsx` collapsible with evidence list
 - [x] **4.5** What-if simulation panel — `WhatIfPanel.tsx` with sliders + `ProjectionChart.tsx`
-- [ ] **4.6** Historical playback (time slider + controls) — `playbackSlice` + `usePlayback.ts` ready, `BottomTimeline` needs UI
-  - Slider range: 0 to `max_sim_time` seconds
-  - On scrub: call `GET /api/sensors/history?before=<sim_time>&limit=1` to load historical state
-  - Pause live updates while in playback mode; resume on "live" button
+- [x] **4.6** Historical playback (time slider + controls)
+  - `BottomTimeline.tsx` rewritten: LIVE badge / playback button, time scrubber slider, scenario progress bar
+  - `GET /api/sensors/snapshot?sim_time=X` backend endpoint added (returns all 21 sensors at closest sim_time)
+  - `useWebSocket.ts` suppresses live sensor/health updates while in playback mode
+  - `api.ts` updated with `getSensorsSnapshot()` method
+  - `frontend/src/store/index.ts` updated with `duvalHistory: DuvalResult[]` ring buffer (max 20)
 - [ ] **4.7** Full integration test — run fault scenario, verify end-to-end
   - Backend running, frontend connected
   - Trigger hot_spot scenario from UI
@@ -266,3 +268,4 @@ Target: Charts + Duval Triangle + Alerts + Simulation + Playback
 | 2026-03-20 | 2 | Full doc review. Created THERMAL_PHYSICS.md, DGA_GAS_GENERATION.md, DUVAL_TRIANGLE_VERTICES.md, FMEA_DEFINITIONS.md, .env.example, improvement.md. Updated INTEGRATION_CONTRACT.md and PROGRESS.md. | Phase 1.3a: add physics constants to config.py, then implement simulator modules |
 | 2026-03-21 | 3 | Phase 1.3 + 1.4 + 1.6 fully implemented. All physics models (thermal IEC 60076-7, DGA Arrhenius, equipment hysteresis) running. Engine tick loop wired. Scenario modifiers (hot_spot, arcing, cooling_failure) complete. WebSocket streaming live. REST routes for sensors/current, scenario/status/trigger, and simulation/speed wired to engine. Fixed winding_delta runaway bug (ADR-006). | Phase 2: anomaly detection, DGA analysis, FMEA, health score |
 | 2026-03-21 | 4 | Phase 2 fully implemented (2.1–2.7). Anomaly detector (rolling Z-score + rate-of-change), DGA analyzer (Duval Triangle + TDCG + CO2/CO + trends), FMEA engine (8 failure modes), health score (weighted penalty), what-if simulation (IEC 60076-7 Arrhenius), analytics wired into engine tick loop + WebSocket + SQLite persistence. 28/28 integration tests pass. | Phase 3/4 frontend integration with live backend data |
+| 2026-03-21 | 5 | Phase 4.2a-c + 4.6 complete. Duval Triangle: correct IEC 60599 coordinate system, all 7 zone polygons with colors, live point + 20-reading fading trail, gas % display. Historical playback: LIVE/PLAYBACK toggle in BottomTimeline, scrubber slider, debounced snapshot API call, WebSocket suppression in playback mode. Fixed critical port bug (api.ts + useWebSocket.ts pointed to 8000, corrected to 8001). Backend: GET /api/sensors/snapshot endpoint added. Frontend build passes tsc + vite. | Phase 4.7 end-to-end integration test, then Phase 5 polish |

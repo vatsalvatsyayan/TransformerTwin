@@ -43,6 +43,32 @@ async def insert_sensor_reading(
         await db.commit()
 
 
+async def get_sensor_snapshot(sim_time: float) -> list[dict]:
+    """Return the closest reading at or before sim_time for each sensor.
+
+    Uses a single GROUP BY query to efficiently find the latest sim_time
+    per sensor_id that does not exceed the requested sim_time.
+
+    Args:
+        sim_time: Upper bound on simulation seconds (inclusive).
+
+    Returns:
+        List of dicts with keys: sensor_id, value, status, timestamp, sim_time.
+        Empty list if no readings exist at or before the given sim_time.
+    """
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT sensor_id, value, status, timestamp, MAX(sim_time) AS sim_time"
+            " FROM sensor_readings"
+            " WHERE sim_time <= ?"
+            " GROUP BY sensor_id",
+            (sim_time,),
+        )
+        rows = await cursor.fetchall()
+
+    return [dict(row) for row in rows]
+
+
 async def get_sensor_history(
     sensor_id: str,
     from_ts: str | None = None,

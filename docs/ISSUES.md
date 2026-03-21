@@ -7,6 +7,20 @@
 
 ## Open
 
+### 🔧 ISSUE-007: Playback slider max is `simTime` at component render (not live-updating)
+- **Found**: Phase 4.6 (2026-03-21)
+- **Severity**: Low
+- **Description**: The range slider in `BottomTimeline.tsx` uses `Math.max(simTime, 1)` as the `max` attribute. `simTime` is read from the Zustand store, so it does update as the sim runs. However, when the user is in playback mode, `simTime` still advances (the WebSocket suppression only affects `updateReadings`/`updateHealth`, not `setSimTime` via `sensor_update` messages — wait, actually `setSimTime` is also suppressed because it's inside the `mode === 'live'` block). In playback mode `simTime` will freeze at the value when playback was entered.
+- **Impact**: If a user enters playback mode early (low simTime), the slider max will be frozen at that value. They can exit playback and re-enter to get an updated max.
+- **Resolution**: Expose `maxSimTime` separately in the store, always updated regardless of mode. Low priority.
+
+### 🔧 ISSUE-008: SQLite snapshot query uses bare-column behaviour (SQLite-specific)
+- **Found**: Phase 4.6 backend (2026-03-21)
+- **Severity**: Low
+- **Description**: `get_sensor_snapshot()` uses `SELECT sensor_id, value, status, timestamp, MAX(sim_time) FROM sensor_readings WHERE sim_time <= ? GROUP BY sensor_id`. Returning non-aggregated columns (`value`, `status`, `timestamp`) alongside `MAX(sim_time)` is valid in SQLite's "bare column" extension but non-standard SQL.
+- **Impact**: Works correctly in SQLite. Would need a subquery rewrite for PostgreSQL/MySQL.
+- **Resolution**: Add a comment in `queries.py`. Not a bug for this SQLite-based POC.
+
 ### 🔧 ISSUE-005: FM-001 max score capped at ~0.45 in hot-spot test (expected ≥ 0.7)
 - **Found**: Phase 2.7 integration test (2026-03-21)
 - **Severity**: Low

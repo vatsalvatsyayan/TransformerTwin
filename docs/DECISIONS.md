@@ -82,4 +82,25 @@
 - **Rationale**: Completely isolated from live engine state. Concurrent requests don't interfere. The 12-hour burn-in ensures initial transients are removed before the projection timeline starts.
 - **Trade-off**: Each request does 12 + N×24 ThermalModel ticks (cheap). No state is shared, so projections are slightly pessimistic (don't start from current real state). Acceptable for what-if analysis — the point is to show steady-state behavior at the requested conditions.
 
+## ADR-012: Duval Triangle uses CH4→BL, C2H4→BR, C2H2→Top convention
+- **Date**: 2026-03-21
+- **Context**: The skeleton `duvalGeometry.ts` used an incorrect vertex orientation that placed CH4 in the middle of the base. The `DuvalTriangle.tsx` axis labels were also wrong.
+- **Decision**: Rewrite `duvalGeometry.ts` with the correct IEC 60599 convention: CH4=100% at bottom-left (0,0), C2H4=100% at bottom-right (1,0), C2H2=100% at top (0.5, 0.866).
+- **Rationale**: Matches `docs/DUVAL_TRIANGLE_VERTICES.md` exactly. Zone polygon vertices from that doc are normalized [0,1] Cartesian and now render correctly.
+- **Trade-off**: Breaking change to `ternaryToCartesian` signature — now takes `TernaryPoint` with fractions and additional optional SVG size/padding args. DuvalTriangle.tsx updated in the same commit.
+
+## ADR-013: Historical playback uses snapshot endpoint (not per-sensor history)
+- **Date**: 2026-03-21
+- **Context**: Phase 4.6 playback slider needs to load sensor state at a given sim_time. The existing `/api/sensors/history` endpoint returns one sensor at a time.
+- **Decision**: Add `GET /api/sensors/snapshot?sim_time=X` endpoint that returns all 21 sensors in one query using `GROUP BY sensor_id` with `MAX(sim_time)`.
+- **Rationale**: One network round-trip instead of 21. Single query is O(N log N) instead of O(21N). Keeps the response shape identical to `/api/sensors/current` so the frontend can reuse the same store action.
+- **Trade-off**: SQLite's "bare column" behavior with GROUP BY (non-aggregated columns from MAX() row) is well-defined in SQLite but nonstandard SQL. Acceptable for this POC; would need `JOIN` subquery for other databases.
+
+## ADR-014: WebSocket suppresses sensor/health updates in playback mode
+- **Date**: 2026-03-21
+- **Context**: When the user scrubs to a historical time, the next live WebSocket message would immediately overwrite the historical state.
+- **Decision**: `useWebSocket.ts` checks `mode === 'live'` before calling `updateReadings` and `updateHealth`. Alerts still flow through in both modes (user should see new alerts even while reviewing history).
+- **Rationale**: Simple client-side gate. The WebSocket stays connected so reconnection logic is unaffected. Returning to live mode is instant (no reconnect needed).
+- **Trade-off**: Scenario updates (progress bar, stage) continue in playback mode — acceptable since they don't affect sensor data display.
+
 *Add new ADRs below as decisions are made during implementation.*

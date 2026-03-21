@@ -5,7 +5,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../store'
 import type { ServerMessage } from '../types/websocket'
 
-const WS_URL = 'ws://localhost:8000/ws'
+const WS_URL = 'ws://localhost:8001/ws'
 
 /** Exponential backoff delays (ms): 1s, 2s, 4s, 8s, 16s, 30s max */
 const BACKOFF_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000]
@@ -22,6 +22,7 @@ export function useWebSocket(): void {
   const updateScenario = useStore((s) => s.updateScenario)
   const setSpeedMultiplier = useStore((s) => s.setSpeedMultiplier)
   const setSimTime = useStore((s) => s.setSimTime)
+  const mode = useStore((s) => s.mode)
 
   const handleMessage = useCallback(
     (msg: ServerMessage) => {
@@ -33,20 +34,27 @@ export function useWebSocket(): void {
           break
 
         case 'sensor_update':
-          updateReadings(msg.group, msg.sensors, msg.sim_time, msg.timestamp)
-          setSimTime(msg.sim_time, msg.timestamp)
+          // In playback mode, suppress live sensor/health updates so historical
+          // state loaded by the slider remains visible.
+          if (mode === 'live') {
+            updateReadings(msg.group, msg.sensors, msg.sim_time, msg.timestamp)
+            setSimTime(msg.sim_time, msg.timestamp)
+          }
           break
 
         case 'health_update':
-          updateHealth(
-            msg.overall_score,
-            msg.previous_score,
-            msg.components,
-            msg.timestamp,
-          )
+          if (mode === 'live') {
+            updateHealth(
+              msg.overall_score,
+              msg.previous_score,
+              msg.components,
+              msg.timestamp,
+            )
+          }
           break
 
         case 'alert':
+          // Always add alerts regardless of playback mode
           addAlert(msg.alert)
           break
 
@@ -69,7 +77,7 @@ export function useWebSocket(): void {
           break
       }
     },
-    [setSpeedMultiplier, setSimTime, updateReadings, updateHealth, addAlert, updateScenario],
+    [setSpeedMultiplier, setSimTime, updateReadings, updateHealth, addAlert, updateScenario, mode],
   )
 
   const connect = useCallback(() => {
