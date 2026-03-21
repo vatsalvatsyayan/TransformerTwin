@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { StatusDot } from '../common/StatusDot'
 import { SensorSparkline } from '../charts/SensorSparkline'
 import { useSensorHistory } from '../../hooks/useSensorHistory'
+import { useSensorReading } from '../../store/selectors'
 import { SENSOR_META } from '../../lib/constants'
 import { formatSensorValue } from '../../lib/formatters'
 import type { SensorId } from '../../types/sensors'
@@ -14,13 +15,13 @@ export interface SensorRowProps {
 
 export const SensorRow = memo(function SensorRow({ sensorId }: SensorRowProps) {
   const { latestValue } = useSensorHistory(sensorId)
+  const reading = useSensorReading(sensorId)
   const meta = SENSOR_META[sensorId]
   const label = meta?.label ?? sensorId
   const unit = meta?.unit ?? ''
 
-  // Determine status from value vs thresholds (simplified; real status comes from WS)
-  // For skeleton: always NORMAL
-  const status = 'NORMAL'
+  // Use live status from WebSocket (NORMAL / CAUTION / WARNING / CRITICAL / ON / OFF)
+  const status = reading?.status ?? 'NORMAL'
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#252840] hover:bg-[#252840] transition-colors">

@@ -53,6 +53,18 @@
 
 ## Resolved
 
+### ✅ ISSUE-009: SensorRow hardcoded status NORMAL (never showed CAUTION/WARNING/CRITICAL)
+- **Found**: Phase 5 review (2026-03-21)
+- **Severity**: Medium — status dots always showed green regardless of actual sensor state
+- **Description**: `SensorRow.tsx` had `const status = 'NORMAL'` hardcoded. The `status` field arrives on each `SensorReading` from the WebSocket engine but was never read.
+- **Resolution**: Phase 5.1 — replaced with `useSensorReading(sensorId)` selector; status now reflects live engine output.
+
+### ✅ ISSUE-010: Initial API fetch errors silently swallowed
+- **Found**: Phase 5 review (2026-03-21)
+- **Severity**: Low — `void fetchCurrentSensors()` silently dropped any fetch errors on startup
+- **Description**: `App.tsx` called initial REST fetches with `void` prefix so thrown errors were uncaught.
+- **Resolution**: Phase 5.2 — changed to `.catch()` handlers that log warnings to console.
+
 ### ✅ ISSUE-001: REST routes still returning stub data
 - **Resolved**: Phase 2.6 (2026-03-21)
 - **Resolution**: `/api/health`, `/api/dga/analysis`, `/api/fmea` now read from `engine.latest_*` attributes set by the analytics tick loop.

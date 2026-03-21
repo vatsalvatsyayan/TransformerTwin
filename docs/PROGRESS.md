@@ -1,11 +1,11 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21
+> Last updated: 2026-03-21 (Session 6 — Phase 5 complete)
 
 ---
 
-## Current Status: 🟡 Phase 4 In Progress — Duval Triangle + Playback Complete, Integration Test Remaining
+## Current Status: 🟢 Phase 5 Complete — Polish, Error Handling, README, Demo Script Done
 
 All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing.
 
@@ -222,22 +222,24 @@ Target: Charts + Duval Triangle + Alerts + Simulation + Playback
   - `useWebSocket.ts` suppresses live sensor/health updates while in playback mode
   - `api.ts` updated with `getSensorsSnapshot()` method
   - `frontend/src/store/index.ts` updated with `duvalHistory: DuvalResult[]` ring buffer (max 20)
-- [ ] **4.7** Full integration test — run fault scenario, verify end-to-end
-  - Backend running, frontend connected
-  - Trigger hot_spot scenario from UI
-  - Assert: sensor values change visibly within 10 seconds (at 10× speed)
-  - Assert: Duval triangle point moves over time
-  - Assert: alert appears in AlertPanel
-  - Assert: health gauge drops
+- [x] **4.7** Full integration test — run fault scenario, verify end-to-end
+  - 28/28 backend integration tests pass
+  - Frontend TypeScript build passes (tsc + vite build clean)
+  - Manual verification: start backend on 8001, frontend on 5173, trigger hot_spot at 10×
+    → sensor values change, Duval point moves, alerts appear, health drops
 
 ---
 
-## Phase 5: Polish & Demo Prep
-- [ ] **5.1** UI polish (animations, transitions, loading states)
-- [ ] **5.2** Error handling (WebSocket disconnect, API errors)
-- [ ] **5.3** Demo script — write out what to show and say
-- [ ] **5.4** README.md — setup instructions, screenshots
-- [ ] **5.5** Final end-to-end test with all scenarios
+## Phase 5: Polish & Demo Prep ✅ COMPLETE
+- [x] **5.1** UI polish (loading states, real sensor status)
+  - `SensorRow.tsx`: replaced hardcoded `'NORMAL'` with live status from `useSensorReading` selector
+  - `App.tsx`: added initial connecting overlay (spinner before first data) + disconnection banner when WS drops
+- [x] **5.2** Error handling (WebSocket disconnect, API errors)
+  - Initial REST fetches in `App.tsx` now have `.catch()` handlers (errors logged, not silent)
+  - Disconnected banner displayed when `connectionStatus === 'disconnected'` and data was previously received
+- [x] **5.3** Demo script — `docs/DEMO_SCRIPT.md` — 8-segment, ~10-minute walkthrough with talking points and troubleshooting guide
+- [x] **5.4** README.md — full setup instructions, project structure, API reference, WebSocket protocol, architecture notes
+- [x] **5.5** Final verification: 28/28 backend tests pass, frontend build clean (tsc + vite)
 
 ---
 
@@ -269,3 +271,4 @@ Target: Charts + Duval Triangle + Alerts + Simulation + Playback
 | 2026-03-21 | 3 | Phase 1.3 + 1.4 + 1.6 fully implemented. All physics models (thermal IEC 60076-7, DGA Arrhenius, equipment hysteresis) running. Engine tick loop wired. Scenario modifiers (hot_spot, arcing, cooling_failure) complete. WebSocket streaming live. REST routes for sensors/current, scenario/status/trigger, and simulation/speed wired to engine. Fixed winding_delta runaway bug (ADR-006). | Phase 2: anomaly detection, DGA analysis, FMEA, health score |
 | 2026-03-21 | 4 | Phase 2 fully implemented (2.1–2.7). Anomaly detector (rolling Z-score + rate-of-change), DGA analyzer (Duval Triangle + TDCG + CO2/CO + trends), FMEA engine (8 failure modes), health score (weighted penalty), what-if simulation (IEC 60076-7 Arrhenius), analytics wired into engine tick loop + WebSocket + SQLite persistence. 28/28 integration tests pass. | Phase 3/4 frontend integration with live backend data |
 | 2026-03-21 | 5 | Phase 4.2a-c + 4.6 complete. Duval Triangle: correct IEC 60599 coordinate system, all 7 zone polygons with colors, live point + 20-reading fading trail, gas % display. Historical playback: LIVE/PLAYBACK toggle in BottomTimeline, scrubber slider, debounced snapshot API call, WebSocket suppression in playback mode. Fixed critical port bug (api.ts + useWebSocket.ts pointed to 8000, corrected to 8001). Backend: GET /api/sensors/snapshot endpoint added. Frontend build passes tsc + vite. | Phase 4.7 end-to-end integration test, then Phase 5 polish |
+| 2026-03-21 | 6 | Phase 5 complete. Fixed SensorRow status (was hardcoded NORMAL). Added disconnection banner and connecting overlay in App.tsx. Fixed silent API error swallowing. Wrote README.md (full setup, API reference, architecture notes). Wrote docs/DEMO_SCRIPT.md (10-min walkthrough, 8 segments, talking points, troubleshooting). 28/28 tests pass, frontend build clean. | Project complete — all phases done |
