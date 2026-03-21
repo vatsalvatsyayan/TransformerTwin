@@ -1,4 +1,4 @@
-// React Three Fiber Canvas + camera + lights
+// React Three Fiber Canvas + camera + lights — bright outdoor industrial setting
 
 import { memo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
@@ -18,25 +18,48 @@ export const TransformerScene = memo(function TransformerScene() {
   }
 
   return (
-    <div className="relative w-full h-full bg-[#0f1117]">
+    <div className="relative w-full h-full bg-[#c4d4db]">
       <Canvas
         camera={{ position: [4, 3, 5], fov: 45, near: 0.1, far: 100 }}
         shadows
+        gl={{ antialias: true }}
       >
-        {/* Ambient + directional lighting */}
-        <ambientLight intensity={0.4} />
-        <directionalLight
-          position={[5, 8, 5]}
-          intensity={1.2}
-          castShadow
-          shadow-mapSize={[1024, 1024]}
-        />
-        <directionalLight position={[-5, 3, -5]} intensity={0.3} />
+        {/* Sky background colour */}
+        <color attach="background" args={['#c4d4db']} />
 
-        {/* Ground plane */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.7, 0]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial color="#1a1d27" />
+        {/* Hemisphere light — sky blue above, warm concrete below */}
+        <hemisphereLight args={['#dbeafe', '#a8a090', 1.2]} />
+
+        {/* Primary sun-like directional light from upper-right */}
+        <directionalLight
+          position={[6, 10, 6]}
+          intensity={2.8}
+          castShadow
+          shadow-mapSize={[2048, 2048]}
+          shadow-camera-near={0.5}
+          shadow-camera-far={50}
+          shadow-camera-left={-8}
+          shadow-camera-right={8}
+          shadow-camera-top={8}
+          shadow-camera-bottom={-8}
+        />
+
+        {/* Fill light from opposite side — reduces harsh shadows */}
+        <directionalLight position={[-5, 4, -4]} intensity={1.2} />
+
+        {/* Front fill to illuminate the face of the transformer */}
+        <directionalLight position={[0, 2, 8]} intensity={0.8} />
+
+        {/* Concrete ground pad */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.75, 0]} receiveShadow>
+          <planeGeometry args={[24, 24]} />
+          <meshStandardMaterial color="#8f8f87" roughness={0.95} metalness={0} />
+        </mesh>
+
+        {/* Darker concrete pad directly under the transformer */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.74, 0]} receiveShadow>
+          <planeGeometry args={[3.5, 2.2]} />
+          <meshStandardMaterial color="#7a7a72" roughness={0.98} metalness={0} />
         </mesh>
 
         <TransformerModel />

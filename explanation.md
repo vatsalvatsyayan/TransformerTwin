@@ -72,7 +72,7 @@ Oil-immersed transformers use the oil itself as the primary coolant. Three cooli
 
 **Practical example:** At 25°C ambient in ONAN at full load: top-oil temperature ≈ 25 + 55 = 80°C. If we switch to OFAF: 25 + 30 = 55°C. Cooling makes a dramatic difference.
 
-**In our simulator:** Fan Bank 1 activates when top-oil exceeds 75°C (ONAN→ONAF); Fan Bank 2 at 85°C; Oil Pump when load exceeds 80%.
+**In our simulator:** Fan Bank 1 activates when top-oil exceeds 65°C (ONAN→ONAF); Fan Bank 2 at 75°C; Oil Pump when load exceeds 70% OR top-oil exceeds 80°C.
 
 ### 2.4 The Three Temperatures
 
@@ -720,11 +720,11 @@ Every real second (tick):
 
 ### Known Discrepancies 🔸
 
-**1. Fan Bank Thresholds**
+**1. Fan Bank Thresholds — RESOLVED**
 - PRD (F2 AC7): Fan Bank 1 ON at 65°C, Fan Bank 2 ON at 75°C, Oil Pump ON when load > 70% OR top_oil > 80°C
-- Implementation (`equipment_model.py`): Fan Bank 1 ON at 75°C, Fan Bank 2 ON at 85°C, Oil Pump ON when load > 80% only
-- **Impact:** Fans don't turn on during normal peak operation, reducing visual feedback
-- **Mitigation:** Added `top_oil_delta` to hot_spot scenario (Stage 2: +15°C, Stage 3: +25°C) so fans activate visually during the main demo scenario
+- Implementation (`equipment_model.py`): Now matches PRD exactly — Fan Bank 1 ON at ≥65°C (OFF <60°C), Fan Bank 2 ON at ≥75°C (OFF <70°C), Oil Pump ON when load ≥70% OR top_oil ≥80°C
+- At peak weekday load (85%, 35°C ambient), ONAN steady-state top_oil ≈ 75°C → Fan Bank 1 activates → ONAF mode → top_oil stabilizes ~66°C → Fan Bank 1 stays on (>60°C)
+- The `top_oil_delta` addition to the hot_spot scenario provides additional visual feedback during the demo scenario on top of the correct threshold behavior
 
 **2. Health Score Penalty Values**
 - PRD (F6): CAUTION=20, WARNING=50, CRITICAL=90

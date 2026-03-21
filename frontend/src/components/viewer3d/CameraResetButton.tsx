@@ -10,7 +10,7 @@ export const CameraResetButton = memo(function CameraResetButton({ onReset }: Ca
   return (
     <button
       onClick={onReset}
-      className="absolute top-3 right-3 bg-[#252840] border border-[#3d4168] text-slate-400 text-xs px-2 py-1 rounded hover:bg-[#2d3148] transition-colors"
+      className="absolute top-3 right-3 bg-white/70 backdrop-blur-sm border border-slate-300 text-slate-700 text-xs px-2 py-1 rounded hover:bg-white/90 transition-colors shadow"
     >
       Reset Camera
     </button>

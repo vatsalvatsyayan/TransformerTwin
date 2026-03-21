@@ -12,20 +12,29 @@ from config import TAP_MIN_POSITION, TAP_MAX_POSITION, TAP_NOMINAL_POSITION
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Equipment thresholds — Phase 1.3d spec (docs/PROGRESS.md)
+# Equipment thresholds — PRD F2 Acceptance Criterion 7
 # ---------------------------------------------------------------------------
 
-# Fan bank 1: activates at 75°C top oil, deactivates at 70°C (hysteresis prevents cycling)
-FAN1_ON_THRESHOLD_C: float = 75.0
-FAN1_OFF_THRESHOLD_C: float = 70.0
+# Fan bank 1: activates at 65°C top oil, deactivates at 60°C (hysteresis prevents cycling).
+# At peak weekday load (85%, 35°C ambient) ONAN steady-state top oil ≈ 75°C,
+# so Fan Bank 1 turns ON during normal daily peaks → switches to ONAF → oil drops to ~66°C
+# → Fan Bank 1 stays ON (> 60°C off-threshold). This matches the THERMAL_PHYSICS.md
+# validation table which shows ONAF mode at peak load conditions.
+FAN1_ON_THRESHOLD_C: float = 65.0
+FAN1_OFF_THRESHOLD_C: float = 60.0
 
-# Fan bank 2: activates at 85°C top oil, deactivates at 80°C
-FAN2_ON_THRESHOLD_C: float = 85.0
-FAN2_OFF_THRESHOLD_C: float = 80.0
+# Fan bank 2: activates at 75°C top oil, deactivates at 70°C.
+# Only needed at very high load, high ambient, or during fault scenarios.
+FAN2_ON_THRESHOLD_C: float = 75.0
+FAN2_OFF_THRESHOLD_C: float = 70.0
 
-# Oil pump: activates when load > 80%, deactivates when load < 75%
-PUMP_ON_LOAD_FRACTION: float = 0.80
-PUMP_OFF_LOAD_FRACTION: float = 0.75
+# Oil pump: activates when load > 70% OR top oil > 80°C, deactivates when
+# load < 65% AND top oil < 75°C (PRD F2 AC7).
+# Load > 70% covers normal afternoon peak hours; top_oil > 80°C covers fault scenarios.
+PUMP_ON_LOAD_FRACTION: float = 0.70
+PUMP_OFF_LOAD_FRACTION: float = 0.65
+PUMP_ON_TOP_OIL_C: float = 80.0
+PUMP_OFF_TOP_OIL_C: float = 75.0
 
 # Tap changer: follows load, ±3 taps around nominal (17) over 0–100% load range
 TAP_LOAD_RANGE_TAPS: int = 3  # ±3 taps from nominal
@@ -86,13 +95,17 @@ class EquipmentModel:
             fan_bank_2 = False
             logger.debug("Fan bank 2 OFF (top_oil=%.1f°C)", top_oil_temp)
 
-        # --- Oil pump (hysteresis on load fraction) ---
-        if not oil_pump_1 and load_fraction >= PUMP_ON_LOAD_FRACTION:
+        # --- Oil pump (hysteresis on load fraction OR top oil temp — PRD F2 AC7) ---
+        pump_should_on = (load_fraction >= PUMP_ON_LOAD_FRACTION
+                          or top_oil_temp >= PUMP_ON_TOP_OIL_C)
+        pump_should_off = (load_fraction < PUMP_OFF_LOAD_FRACTION
+                           and top_oil_temp < PUMP_OFF_TOP_OIL_C)
+        if not oil_pump_1 and pump_should_on:
             oil_pump_1 = True
-            logger.debug("Oil pump ON (load=%.2f)", load_fraction)
-        elif oil_pump_1 and load_fraction < PUMP_OFF_LOAD_FRACTION:
+            logger.debug("Oil pump ON (load=%.2f, top_oil=%.1f°C)", load_fraction, top_oil_temp)
+        elif oil_pump_1 and pump_should_off:
             oil_pump_1 = False
-            logger.debug("Oil pump OFF (load=%.2f)", load_fraction)
+            logger.debug("Oil pump OFF (load=%.2f, top_oil=%.1f°C)", load_fraction, top_oil_temp)
 
         # --- Tap position: tracks load, ±TAP_LOAD_RANGE_TAPS around nominal ---
         # Map load fraction 0.0→1.0 to tap offset -TAP_LOAD_RANGE_TAPS→+TAP_LOAD_RANGE_TAPS
