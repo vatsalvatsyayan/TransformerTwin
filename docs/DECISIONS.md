@@ -117,4 +117,18 @@
 - **Rationale**: The engine already computes boolean status for these sensors via `_compute_sensor_status()`. Reading from `status` avoids a magic threshold check on the frontend, keeping domain logic in the backend.
 - **Trade-off**: Tight coupling between frontend display logic and the backend's status string values ("ON"/"OFF"). Documented in Integration Contract as valid `SensorStatus` values.
 
+## ADR-017: Frontend unit tests use explicit Vitest imports (no globals)
+- **Date**: 2026-03-21
+- **Context**: Vitest supports both `globals: true` (auto-inject describe/it/expect) and explicit imports. Setting globals requires adding `"types": ["vitest/globals"]` to tsconfig, which could conflict with the existing strict tsconfig and its `noUnusedLocals` / `noUnusedParameters` flags.
+- **Decision**: Use explicit `import { describe, it, expect, beforeEach } from 'vitest'` in all test files. No tsconfig changes needed.
+- **Rationale**: Keeps the test setup minimal — no need for a separate tsconfig for tests, no injection of globals that TypeScript doesn't know about. Explicit imports are also more self-documenting.
+- **Trade-off**: Slightly more boilerplate per test file (one import line). Accepted — all test files are small.
+
+## ADR-018: Test environment set to 'node' (not 'jsdom')
+- **Date**: 2026-03-21
+- **Context**: The frontend test suite covers pure utility functions (duvalGeometry, formatters) and Zustand store actions. No React component rendering is tested.
+- **Decision**: Set `test.environment: 'node'` in vite.config.ts.
+- **Rationale**: jsdom adds significant overhead and isn't needed for pure function and store action tests. Zustand stores work in a Node environment because they're just closures around JavaScript state.
+- **Trade-off**: Component rendering tests (React Testing Library) would require switching to `'jsdom'` environment. If component tests are added later, the environment config will need to change.
+
 *Add new ADRs below as decisions are made during implementation.*
