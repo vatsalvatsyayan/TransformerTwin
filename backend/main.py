@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import routes_alerts, routes_dga, routes_fmea, routes_health
 from api import routes_scenario, routes_sensor, routes_simulation
 from api import routes_speed, routes_transformer
-from api.websocket_handler import router as ws_router
+from api.websocket_handler import router as ws_router, manager as ws_manager, set_engine
 from config import API_PREFIX, CORS_ALLOWED_ORIGIN
 from database.migrations import run_migrations
 from simulator.engine import SimulatorEngine
@@ -55,7 +55,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     simulator = SimulatorEngine(speed_multiplier=1)
     app.state.simulator = simulator
 
-    # 3. Launch simulator background task
+    # 3. Register WebSocket broadcast callbacks on the engine
+    set_engine(simulator)
+    simulator.register_sensor_callback(ws_manager.broadcast)
+    simulator.register_scenario_callback(ws_manager.broadcast)
+
+    # 4. Launch simulator background task
     sim_task = asyncio.create_task(simulator.run(), name="simulator")
     logger.info("Simulator started.")
 

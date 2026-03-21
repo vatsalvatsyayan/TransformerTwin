@@ -41,4 +41,17 @@
 
 ---
 
+## ADR-006: Scenario winding_delta applied to output only, not internal state
+- **Date**: 2026-03-21
+- **Context**: Implementing Phase 1.3 ThermalModel and Phase 1.4 scenario modifiers.
+- **Decision**: `winding_delta` from fault scenarios is added to the ThermalModel **output** only; the internal `self._winding` stores only the physics value (no delta).
+- **Rationale**: If winding_delta were accumulated into `self._winding`, the exponential lag formula `θ(t+1) = θ_ss + (θ(t) - θ_ss) × e^(-dt/τ)` would diverge to θ_ss + delta/(1 - e^(-dt/τ)). With τ_winding=600s and dt=1s, this is delta × 600, turning a 15°C delta into a 9000°C spike. Adding to output only gives a constant, stable elevation of exactly `winding_delta` °C above the physics value.
+- **Trade-off**: The scenario-elevated winding temperature does not feedback into the oil thermal model (top oil remains unaffected by the winding delta). This is a reasonable simplification for Phase 1 — in reality, a local hot spot does affect oil temperature, but the effect is smaller and the correction would need the full OFAF dynamic model.
+
+## ADR-007: TransformerState field name `load_current` (not `load_current_pct`)
+- **Date**: 2026-03-21
+- **Context**: `LOAD_CURRENT` sensor ID maps to field via `sensor_id.lower()` pattern. The original skeleton used `load_current_pct` which broke the pattern.
+- **Decision**: Renamed to `load_current` in `models/schemas.py` to match the universal `sensor_id.lower()` pattern.
+- **Rationale**: All 21 sensors now map cleanly via `sensor_id.lower()` to their TransformerState fields. No special-case mappings needed.
+
 *Add new ADRs below as decisions are made during implementation.*

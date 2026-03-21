@@ -36,8 +36,7 @@ async def set_simulation_speed(
         SpeedUpdateResponseSchema with new speed and effective intervals.
     """
     speed = body.speed_multiplier
-
-    # TODO (Phase 1.6): request.app.state.simulator.set_speed(speed)
+    request.app.state.simulator.set_speed(speed)
 
     # Compute effective wall-clock milliseconds per group at this speed
     def ms(sim_interval_s: int) -> int:

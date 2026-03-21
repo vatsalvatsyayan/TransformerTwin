@@ -8,7 +8,7 @@ GET /api/sensors/history  — historical readings for one sensor
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from config import (
     ALL_SENSOR_IDS,
@@ -29,23 +29,44 @@ router = APIRouter()
 
 
 @router.get("/sensors/current", response_model=SensorsCurrentResponseSchema)
-async def get_sensors_current() -> SensorsCurrentResponseSchema:
+async def get_sensors_current(request: Request) -> SensorsCurrentResponseSchema:
     """Return the latest reading for all 21 sensors.
+
+    Args:
+        request: FastAPI request (used to access app.state.simulator).
 
     Returns:
         SensorsCurrentResponseSchema with timestamp, sim_time, and all sensors.
     """
-    # TODO (Phase 1.6): read from SimulatorEngine state instead of stubs
+    from simulator.engine import _compute_sensor_status
+
+    simulator = request.app.state.simulator
+    state = simulator.get_current_state()
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    sensors: dict[str, SensorReadingSchema] = {
-        sid: SensorReadingSchema(
-            value=0.0,
-            unit=SENSOR_UNITS.get(sid, ""),
-            status="NORMAL",
-        )
-        for sid in ALL_SENSOR_IDS
-    }
-    return SensorsCurrentResponseSchema(timestamp=now, sim_time=0.0, sensors=sensors)
+
+    sensors: dict[str, SensorReadingSchema] = {}
+    for sid in ALL_SENSOR_IDS:
+        field = sid.lower()
+        raw = getattr(state, field, 0.0)
+        if isinstance(raw, bool):
+            sensors[sid] = SensorReadingSchema(
+                value=1.0 if raw else 0.0,
+                unit=SENSOR_UNITS.get(sid, ""),
+                status="ON" if raw else "OFF",
+            )
+        else:
+            value = float(raw)
+            sensors[sid] = SensorReadingSchema(
+                value=value,
+                unit=SENSOR_UNITS.get(sid, ""),
+                status=_compute_sensor_status(sid, value),
+            )
+
+    return SensorsCurrentResponseSchema(
+        timestamp=now,
+        sim_time=state.sim_time,
+        sensors=sensors,
+    )
 
 
 @router.get("/sensors/history", response_model=SensorHistoryResponseSchema)

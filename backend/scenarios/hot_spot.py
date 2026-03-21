@@ -4,17 +4,47 @@ TransformerTwin — FM-001 Developing Hot Spot scenario.
 A blocked cooling duct causes localized winding overheating.
 Progresses over 2 simulated hours (7200 sim-seconds).
 
-Stages:
-  0–20%:   Stage 1: Blocked duct detected — slight winding temp rise
-  20–60%:  Stage 2: Gas generation beginning — CH4, C2H4 rising
-  60–90%:  Stage 3: Hot spot established — WINDING_TEMP WARNING threshold
-  90–100%: Stage 4: Critical — CRITICAL threshold approaching
-
-Skeleton only — modifiers implemented in Phase 1.4.
+Stages (from docs/THERMAL_PHYSICS.md and docs/DGA_GAS_GENERATION.md):
+  Stage 1 (0–1800 s):    Hot spot forming — slight winding temp rise
+  Stage 2 (1800–5400 s): Gas generation building — CH4, C2H4 rising
+  Stage 3 (5400–7200 s): Critical hot spot — approaching CRITICAL threshold
 """
 
 from config import SCENARIO_HOT_SPOT_DURATION_S
 from scenarios.base import BaseScenario
+
+# Thermal modifiers: additive °C applied to winding temperature after physics lag
+# Source: docs/THERMAL_PHYSICS.md Section 5
+_WINDING_DELTA_STAGE_1: float = 15.0
+_WINDING_DELTA_STAGE_2: float = 40.0
+_WINDING_DELTA_STAGE_3: float = 80.0
+
+# DGA modifiers: direct ppm/second injection per gas
+# Source: docs/DGA_GAS_GENERATION.md Section 4.2
+_DGA_STAGE_1: dict[str, float] = {
+    "DGA_H2":   0.002,
+    "DGA_CH4":  0.001,
+    "DGA_C2H4": 0.001,
+}
+
+_DGA_STAGE_2: dict[str, float] = {
+    "DGA_H2":   0.010,
+    "DGA_CH4":  0.008,
+    "DGA_C2H4": 0.015,  # C2H4 becoming dominant -> Duval moves toward T2
+    "DGA_CO":   0.020,
+}
+
+_DGA_STAGE_3: dict[str, float] = {
+    "DGA_H2":   0.025,
+    "DGA_CH4":  0.020,
+    "DGA_C2H4": 0.060,  # C2H4 dominant — Duval in T2/T3 zone
+    "DGA_C2H2": 0.003,
+    "DGA_CO":   0.080,
+    "DGA_CO2":  0.200,
+}
+
+_STAGE_1_END_S: float = 1800.0
+_STAGE_2_END_S: float = 5400.0
 
 
 class HotSpotScenario(BaseScenario):
@@ -29,29 +59,39 @@ class HotSpotScenario(BaseScenario):
     duration_sim_s = SCENARIO_HOT_SPOT_DURATION_S
 
     def get_current_stage(self) -> str:
-        """Return current stage description based on progress."""
-        p = self.progress_percent
-        if p < 20:
-            return "Stage 1: Blocked duct detected — winding temp rising"
-        elif p < 60:
-            return "Stage 2: Gas generation beginning"
-        elif p < 90:
-            return "Stage 3: Hot spot established"
+        """Return current stage description based on elapsed sim time."""
+        t = self.elapsed_sim_time
+        if t < _STAGE_1_END_S:
+            return "Stage 1: Hot spot forming — winding temp rising"
+        elif t < _STAGE_2_END_S:
+            return "Stage 2: Gas generation building — CH4, C2H4 rising"
         else:
-            return "Stage 4: Critical — immediate action required"
+            return "Stage 3: Critical hot spot — immediate action required"
 
     def get_thermal_modifiers(self) -> dict[str, float]:
-        """Return winding temperature offset based on fault progression."""
-        # TODO (Phase 1.4): return proportional temperature offset
-        return {"winding_temp_offset": 0.0}
+        """Return winding temperature additive offset for current stage.
+
+        Returns:
+            Dict with key "winding_delta": additive degrees C to winding temp.
+        """
+        t = self.elapsed_sim_time
+        if t < _STAGE_1_END_S:
+            return {"winding_delta": _WINDING_DELTA_STAGE_1}
+        elif t < _STAGE_2_END_S:
+            return {"winding_delta": _WINDING_DELTA_STAGE_2}
+        else:
+            return {"winding_delta": _WINDING_DELTA_STAGE_3}
 
     def get_dga_modifiers(self) -> dict[str, float]:
-        """Return DGA rate multipliers based on fault progression."""
-        # TODO (Phase 1.4): return stage-based gas generation multipliers
-        return {
-            "DGA_H2": 1.0,
-            "DGA_CH4": 1.0,
-            "DGA_C2H6": 1.0,
-            "DGA_C2H4": 1.0,
-            "DGA_C2H2": 1.0,
-        }
+        """Return per-gas ppm/second injection rates for current stage.
+
+        Returns:
+            Dict mapping DGA sensor ID to ppm/second injection rate.
+        """
+        t = self.elapsed_sim_time
+        if t < _STAGE_1_END_S:
+            return dict(_DGA_STAGE_1)
+        elif t < _STAGE_2_END_S:
+            return dict(_DGA_STAGE_2)
+        else:
+            return dict(_DGA_STAGE_3)

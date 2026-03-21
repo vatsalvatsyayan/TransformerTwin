@@ -81,7 +81,7 @@ class TransformerState(BaseModel):
     top_oil_temp: float = 55.0
     bot_oil_temp: float = 45.0
     winding_temp: float = 75.0
-    load_current_pct: float = 60.0
+    load_current: float = 60.0
     ambient_temp: float = 25.0
     dga_h2: float = 10.0
     dga_ch4: float = 5.0

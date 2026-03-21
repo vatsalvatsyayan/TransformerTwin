@@ -58,14 +58,13 @@ async def trigger_scenario(
             detail=f"Unknown scenario: '{scenario_id}'",
         )
 
-    # TODO (Phase 1.6): access request.app.state.simulator.scenario_manager
-    cls = SCENARIO_REGISTRY[scenario_id]
-    instance = cls()
+    simulator = request.app.state.simulator
+    scenario = simulator.scenario_manager.trigger(scenario_id)
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     return ScenarioTriggerResponseSchema(
         scenario_id=scenario_id,  # type: ignore[arg-type]
-        name=instance.name,
+        name=scenario.name,
         status="TRIGGERED",
         description=_SCENARIO_DESCRIPTIONS[scenario_id],
         started_at=now,
@@ -82,13 +81,16 @@ async def get_scenario_status(request: Request) -> ScenarioStatusResponseSchema:
     Returns:
         ScenarioStatusResponseSchema with active scenario details.
     """
-    # TODO (Phase 1.6): access request.app.state.simulator.scenario_manager
+    simulator = request.app.state.simulator
+    scenario = simulator.scenario_manager.active_scenario
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    started_at = scenario.started_at if scenario.started_at else now
+
     return ScenarioStatusResponseSchema(
-        active_scenario="normal",
-        name="Normal Operation",
-        started_at=now,
-        elapsed_sim_time=0.0,
-        progress_percent=0.0,
-        stage="Normal operation",
+        active_scenario=scenario.scenario_id,  # type: ignore[arg-type]
+        name=scenario.name,
+        started_at=started_at,
+        elapsed_sim_time=scenario.elapsed_sim_time,
+        progress_percent=scenario.progress_percent,
+        stage=scenario.get_current_stage(),
     )
