@@ -3,11 +3,21 @@
 import { memo } from 'react'
 import { useHealthColor } from '../../../hooks/useHealthColor'
 
-export const Conservator = memo(function Conservator() {
+export interface ConservatorProps {
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
+}
+
+export const Conservator = memo(function Conservator({ onHover, onHoverEnd, onClick }: ConservatorProps) {
   const { emissive, emissiveIntensity } = useHealthColor('oil_quality')
 
   return (
-    <group>
+    <group
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Horizontal conservator cylinder */}
       <mesh position={[0, 2.0, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.22, 0.22, 1.0, 18]} />

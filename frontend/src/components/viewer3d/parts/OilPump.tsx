@@ -3,11 +3,22 @@
 import { memo } from 'react'
 import { useHealthColor } from '../../../hooks/useHealthColor'
 
-export const OilPump = memo(function OilPump() {
+export interface OilPumpProps {
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
+}
+
+export const OilPump = memo(function OilPump({ onHover, onHoverEnd, onClick }: OilPumpProps) {
   const { emissive, emissiveIntensity } = useHealthColor('cooling')
 
   return (
-    <group position={[0.75, -0.7, 0.75]}>
+    <group
+      position={[0.75, -0.7, 0.75]}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Main pump body */}
       <mesh castShadow>
         <cylinderGeometry args={[0.14, 0.14, 0.45, 12]} />

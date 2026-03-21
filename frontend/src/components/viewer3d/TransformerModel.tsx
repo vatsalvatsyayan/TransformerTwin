@@ -10,10 +10,21 @@ import { FanUnit } from './parts/FanUnit'
 import { OilPump } from './parts/OilPump'
 import { TapChanger } from './parts/TapChanger'
 import { BuchholzRelay } from './parts/BuchholzRelay'
+import type { PartId } from '../../types/parts'
 
 // Tank body: [2, 2.8, 1.1] centred at Y=0 → top lid at Y=1.4
 
-export const TransformerModel = memo(function TransformerModel() {
+export interface TransformerModelProps {
+  onPartHover: (id: PartId) => void
+  onPartHoverEnd: () => void
+  onPartClick: (id: PartId) => void
+}
+
+export const TransformerModel = memo(function TransformerModel({
+  onPartHover,
+  onPartHoverEnd,
+  onPartClick,
+}: TransformerModelProps) {
   return (
     <group>
       {/* === Steel skid cradle (two longitudinal I-beams) === */}
@@ -33,37 +44,109 @@ export const TransformerModel = memo(function TransformerModel() {
       ))}
 
       {/* === Main tank body === */}
-      <Tank />
+      <Tank
+        onHover={() => onPartHover('tank')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('tank')}
+      />
 
       {/* === Conservator, support pipe, breather === */}
-      <Conservator />
+      <Conservator
+        onHover={() => onPartHover('conservator')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('conservator')}
+      />
 
       {/* === HV Bushings — top of tank lid, shaft centre at Y=2.05 === */}
-      <HVBushing position={[-0.5, 2.05, 0.1]} />
-      <HVBushing position={[0,    2.05, 0.1]} />
-      <HVBushing position={[0.5,  2.05, 0.1]} />
+      <HVBushing
+        position={[-0.5, 2.05, 0.1]}
+        onHover={() => onPartHover('hv_bushing')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('hv_bushing')}
+      />
+      <HVBushing
+        position={[0, 2.05, 0.1]}
+        onHover={() => onPartHover('hv_bushing')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('hv_bushing')}
+      />
+      <HVBushing
+        position={[0.5, 2.05, 0.1]}
+        onHover={() => onPartHover('hv_bushing')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('hv_bushing')}
+      />
 
       {/* === LV Bushings — rear top of tank === */}
-      <LVBushing position={[-0.35, 1.82, -0.55]} />
-      <LVBushing position={[0,     1.82, -0.55]} />
-      <LVBushing position={[0.35,  1.82, -0.55]} />
+      <LVBushing
+        position={[-0.35, 1.82, -0.55]}
+        onHover={() => onPartHover('lv_bushing')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('lv_bushing')}
+      />
+      <LVBushing
+        position={[0, 1.82, -0.55]}
+        onHover={() => onPartHover('lv_bushing')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('lv_bushing')}
+      />
+      <LVBushing
+        position={[0.35, 1.82, -0.55]}
+        onHover={() => onPartHover('lv_bushing')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('lv_bushing')}
+      />
 
       {/* === Radiator banks — left and right === */}
-      <RadiatorBank position={[-1.1, 0, 0]} />
-      <RadiatorBank position={[ 1.1, 0, 0]} />
+      <RadiatorBank
+        position={[-1.1, 0, 0]}
+        onHover={() => onPartHover('radiator')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('radiator')}
+      />
+      <RadiatorBank
+        position={[1.1, 0, 0]}
+        onHover={() => onPartHover('radiator')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('radiator')}
+      />
 
       {/* === Fan units — lower radiator banks === */}
-      <FanUnit position={[-1.12, -0.6, 0]} sensorId="FAN_BANK_1" />
-      <FanUnit position={[ 1.12, -0.6, 0]} sensorId="FAN_BANK_2" />
+      <FanUnit
+        position={[-1.12, -0.6, 0]}
+        sensorId="FAN_BANK_1"
+        onHover={() => onPartHover('fan_1')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('fan_1')}
+      />
+      <FanUnit
+        position={[1.12, -0.6, 0]}
+        sensorId="FAN_BANK_2"
+        onHover={() => onPartHover('fan_2')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('fan_2')}
+      />
 
       {/* === Oil circulation pump — front-right === */}
-      <OilPump />
+      <OilPump
+        onHover={() => onPartHover('oil_pump')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('oil_pump')}
+      />
 
       {/* === On-Load Tap Changer — left side === */}
-      <TapChanger />
+      <TapChanger
+        onHover={() => onPartHover('tap_changer')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('tap_changer')}
+      />
 
       {/* === Buchholz relay — on conservator pipe === */}
-      <BuchholzRelay />
+      <BuchholzRelay
+        onHover={() => onPartHover('buchholz_relay')}
+        onHoverEnd={onPartHoverEnd}
+        onClick={() => onPartClick('buchholz_relay')}
+      />
 
       {/* === Pressure relief vent pipe (top of tank) === */}
       <mesh position={[-0.7, 1.65, 0]} castShadow>

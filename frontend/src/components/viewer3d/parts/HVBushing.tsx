@@ -5,16 +5,24 @@ import { useHealthColor } from '../../../hooks/useHealthColor'
 
 export interface HVBushingProps {
   position: [number, number, number]
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
 }
 
 // Skirt disc Y-offsets along the shaft (shaft total height = 1.3)
 const SKIRT_Y = [-0.35, 0.05, 0.42]
 
-export const HVBushing = memo(function HVBushing({ position }: HVBushingProps) {
+export const HVBushing = memo(function HVBushing({ position, onHover, onHoverEnd, onClick }: HVBushingProps) {
   const { emissive, emissiveIntensity } = useHealthColor('bushing')
 
   return (
-    <group position={position}>
+    <group
+      position={position}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Main porcelain shaft */}
       <mesh castShadow>
         <cylinderGeometry args={[0.045, 0.055, 1.3, 10]} />

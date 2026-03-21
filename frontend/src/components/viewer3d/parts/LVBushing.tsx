@@ -5,15 +5,23 @@ import { useHealthColor } from '../../../hooks/useHealthColor'
 
 export interface LVBushingProps {
   position: [number, number, number]
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
 }
 
 const SKIRT_Y = [-0.18, 0.18]
 
-export const LVBushing = memo(function LVBushing({ position }: LVBushingProps) {
+export const LVBushing = memo(function LVBushing({ position, onHover, onHoverEnd, onClick }: LVBushingProps) {
   const { emissive, emissiveIntensity } = useHealthColor('bushing')
 
   return (
-    <group position={position}>
+    <group
+      position={position}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Main porcelain shaft */}
       <mesh castShadow>
         <cylinderGeometry args={[0.05, 0.065, 0.85, 10]} />

@@ -3,11 +3,21 @@
 import { memo } from 'react'
 import { useHealthColor } from '../../../hooks/useHealthColor'
 
-export const Tank = memo(function Tank() {
+export interface TankProps {
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
+}
+
+export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankProps) {
   const { emissive, emissiveIntensity } = useHealthColor('oil_temp')
 
   return (
-    <group>
+    <group
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Main tank body */}
       <mesh position={[0, 0, 0]} castShadow receiveShadow>
         <boxGeometry args={[2, 2.8, 1.1]} />

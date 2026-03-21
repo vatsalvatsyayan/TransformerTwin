@@ -5,6 +5,9 @@ import { useHealthColor } from '../../../hooks/useHealthColor'
 
 export interface RadiatorBankProps {
   position: [number, number, number]
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
 }
 
 const FIN_COUNT = 8
@@ -13,7 +16,7 @@ const FIN_WIDTH = 0.055     // thickness in X (depth of fin)
 const FIN_HEIGHT = 2.5      // same height as tank
 const FIN_DEPTH = 0.07      // thin in Z
 
-export const RadiatorBank = memo(function RadiatorBank({ position }: RadiatorBankProps) {
+export const RadiatorBank = memo(function RadiatorBank({ position, onHover, onHoverEnd, onClick }: RadiatorBankProps) {
   const { emissive, emissiveIntensity } = useHealthColor('cooling')
 
   // Centre the fin array around Z = 0
@@ -21,7 +24,12 @@ export const RadiatorBank = memo(function RadiatorBank({ position }: RadiatorBan
   const startZ = -totalSpan / 2
 
   return (
-    <group position={position}>
+    <group
+      position={position}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Vertical header pipe — connects all fins at top */}
       <mesh position={[0, FIN_HEIGHT / 2 - 0.05, 0]} castShadow>
         <boxGeometry args={[FIN_WIDTH * 0.8, 0.08, totalSpan + FIN_DEPTH + 0.04]} />

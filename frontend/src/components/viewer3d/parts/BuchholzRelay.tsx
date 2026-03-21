@@ -3,11 +3,22 @@
 import { memo } from 'react'
 import { useHealthColor } from '../../../hooks/useHealthColor'
 
-export const BuchholzRelay = memo(function BuchholzRelay() {
+export interface BuchholzRelayProps {
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
+}
+
+export const BuchholzRelay = memo(function BuchholzRelay({ onHover, onHoverEnd, onClick }: BuchholzRelayProps) {
   const { emissive, emissiveIntensity } = useHealthColor('dga')
 
   return (
-    <group position={[0.3, 1.78, 0]}>
+    <group
+      position={[0.3, 1.78, 0]}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Main relay housing */}
       <mesh castShadow>
         <boxGeometry args={[0.18, 0.16, 0.14]} />

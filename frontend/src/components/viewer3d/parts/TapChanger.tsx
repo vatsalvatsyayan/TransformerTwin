@@ -3,11 +3,22 @@
 import { memo } from 'react'
 import { useHealthColor } from '../../../hooks/useHealthColor'
 
-export const TapChanger = memo(function TapChanger() {
+export interface TapChangerProps {
+  onHover?: () => void
+  onHoverEnd?: () => void
+  onClick?: () => void
+}
+
+export const TapChanger = memo(function TapChanger({ onHover, onHoverEnd, onClick }: TapChangerProps) {
   const { emissive, emissiveIntensity } = useHealthColor('winding_temp')
 
   return (
-    <group position={[-1.1, 0.3, 0]}>
+    <group
+      position={[-1.1, 0.3, 0]}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.() }}
+      onPointerOut={(e) => { e.stopPropagation(); onHoverEnd?.() }}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+    >
       {/* Main OLTC housing */}
       <mesh castShadow>
         <boxGeometry args={[0.22, 0.75, 0.55]} />

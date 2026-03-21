@@ -1,15 +1,25 @@
 // React Three Fiber Canvas + camera + lights — bright outdoor industrial setting
 
-import { memo, useRef } from 'react'
+import { memo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { TransformerModel } from './TransformerModel'
 import { StatusLegend } from './StatusLegend'
 import { CameraResetButton } from './CameraResetButton'
+import { ComponentTooltip } from './ComponentTooltip'
+import { PartDetailPanel } from './PartDetailPanel'
+import type { PartId } from '../../types/parts'
+import { PART_META } from '../../types/parts'
+import { useStore } from '../../store'
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib'
 
 export const TransformerScene = memo(function TransformerScene() {
   const controlsRef = useRef<OrbitControlsType>(null)
+  const [hoveredPart, setHoveredPart] = useState<PartId | null>(null)
+  const [selectedPart, setSelectedPart] = useState<PartId | null>(null)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+
+  const components = useStore((s) => s.components)
 
   const resetCamera = () => {
     if (controlsRef.current) {
@@ -17,12 +27,25 @@ export const TransformerScene = memo(function TransformerScene() {
     }
   }
 
+  const getHealthStatus = (partId: PartId): string | undefined => {
+    const healthKey = PART_META[partId].healthKey
+    if (!healthKey) return undefined
+    return components[healthKey]?.status ?? 'NORMAL'
+  }
+
   return (
-    <div className="relative w-full h-full bg-[#c4d4db]">
+    <div
+      className={`relative w-full h-full bg-[#c4d4db] ${hoveredPart ? 'cursor-pointer' : ''}`}
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      }}
+    >
       <Canvas
         camera={{ position: [4, 3, 5], fov: 45, near: 0.1, far: 100 }}
         shadows
         gl={{ antialias: true }}
+        onPointerMissed={() => setSelectedPart(null)}
       >
         {/* Sky background colour */}
         <color attach="background" args={['#c4d4db']} />
@@ -62,7 +85,11 @@ export const TransformerScene = memo(function TransformerScene() {
           <meshStandardMaterial color="#7a7a72" roughness={0.98} metalness={0} />
         </mesh>
 
-        <TransformerModel />
+        <TransformerModel
+          onPartHover={(id) => setHoveredPart(id)}
+          onPartHoverEnd={() => setHoveredPart(null)}
+          onPartClick={(id) => setSelectedPart((prev) => (prev === id ? null : id))}
+        />
 
         <OrbitControls
           ref={controlsRef}
@@ -76,6 +103,22 @@ export const TransformerScene = memo(function TransformerScene() {
 
       <StatusLegend />
       <CameraResetButton onReset={resetCamera} />
+
+      {/* Hover tooltip */}
+      {hoveredPart && (
+        <ComponentTooltip
+          label={PART_META[hoveredPart].label}
+          healthStatus={getHealthStatus(hoveredPart)}
+          visible
+          x={mousePos.x}
+          y={mousePos.y}
+        />
+      )}
+
+      {/* Click detail panel */}
+      {selectedPart && (
+        <PartDetailPanel partId={selectedPart} onClose={() => setSelectedPart(null)} />
+      )}
     </div>
   )
 })
