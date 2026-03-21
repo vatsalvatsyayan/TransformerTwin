@@ -3,6 +3,8 @@ TransformerTwin — FastAPI application entry point.
 
 Configures CORS, mounts all REST routes and the WebSocket endpoint,
 runs the database migration on startup, and launches the simulator loop.
+
+Phase 2.6: registers health, alert, and DB persistence callbacks.
 """
 
 import asyncio
@@ -18,7 +20,9 @@ from api import routes_scenario, routes_sensor, routes_simulation
 from api import routes_speed, routes_transformer
 from api.websocket_handler import router as ws_router, manager as ws_manager, set_engine
 from config import API_PREFIX, CORS_ALLOWED_ORIGIN
+from database import queries
 from database.migrations import run_migrations
+from models.schemas import AlertSchema
 from simulator.engine import SimulatorEngine
 
 logging.basicConfig(
@@ -28,6 +32,35 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _persist_callback(message: dict) -> None:
+    """Persist simulator events (sensor readings, health scores, alerts) to SQLite.
+
+    Args:
+        message: Dict with a "type" key describing the payload.
+    """
+    msg_type = message.get("type")
+    try:
+        if msg_type == "persist_sensor":
+            await queries.insert_sensor_reading(
+                sensor_id=message["sensor_id"],
+                value=message["value"],
+                status=message["status"],
+                sim_time=message["sim_time"],
+                timestamp=message["timestamp"],
+            )
+        elif msg_type == "persist_health":
+            await queries.insert_health_score(
+                overall_score=message["overall_score"],
+                sim_time=message["sim_time"],
+                timestamp=message["timestamp"],
+            )
+        elif msg_type == "persist_alert":
+            alert: AlertSchema = message["alert"]
+            await queries.insert_alert(alert)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("DB persistence error (%s): %s", msg_type, exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and shutdown.
@@ -35,6 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     On startup:
     - Runs database migrations.
     - Creates the SimulatorEngine and stores it in app.state.
+    - Registers all callbacks (WebSocket, health, alerts, DB persistence).
     - Launches the simulator loop as a background task.
 
     On shutdown:
@@ -59,8 +93,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     set_engine(simulator)
     simulator.register_sensor_callback(ws_manager.broadcast)
     simulator.register_scenario_callback(ws_manager.broadcast)
+    simulator.register_health_callback(ws_manager.broadcast)
+    simulator.register_alert_callback(ws_manager.broadcast)
 
-    # 4. Launch simulator background task
+    # 4. Register DB persistence callback
+    simulator.register_persist_callback(_persist_callback)
+
+    # 5. Launch simulator background task
     sim_task = asyncio.create_task(simulator.run(), name="simulator")
     logger.info("Simulator started.")
 

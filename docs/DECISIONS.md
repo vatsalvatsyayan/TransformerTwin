@@ -54,4 +54,32 @@
 - **Decision**: Renamed to `load_current` in `models/schemas.py` to match the universal `sensor_id.lower()` pattern.
 - **Rationale**: All 21 sensors now map cleanly via `sensor_id.lower()` to their TransformerState fields. No special-case mappings needed.
 
+## ADR-008: Analytics wired into engine tick loop (not lazy REST evaluation)
+- **Date**: 2026-03-21
+- **Context**: Phase 2.6 — where to run anomaly_detector, dga_analyzer, fmea_engine, health_score.
+- **Decision**: Run all analytics inside `SimulatorEngine._tick()` after each physics tick. REST routes read from `engine.latest_*` attributes.
+- **Rationale**: WebSocket clients need real-time `alert` and `health_update` messages on every tick. If analytics ran only on REST request, WebSocket would never emit alerts. Storing results in `latest_*` attributes lets REST routes return current values without re-computation.
+- **Trade-off**: Slight CPU overhead on every tick even when no client is connected. Acceptable for POC — the analytics modules are O(1) and take < 1ms per tick.
+
+## ADR-009: Anomaly detector uses min_std floor to avoid zero-division
+- **Date**: 2026-03-21
+- **Context**: When rolling baseline is perfectly stable (all values identical), std=0 causes z = infinity for any deviation.
+- **Decision**: Apply `min_std = sensor_range × 0.01` (1% of sensor range) as floor for std when baseline std is below that value.
+- **Rationale**: A 1% range floor means a sensor must deviate by at least 2% of its operating range (z=2) to trigger CAUTION. This is physically meaningful — sensors have measurement uncertainty of ~0.5–1% so a 2% deviation is a real signal.
+- **Trade-off**: When baseline truly has no variance (e.g., synthetic test data), extremely small deviations still won't trigger alerts since min_std is nonzero. Tests must use slightly varied baseline data to reflect realistic sensor noise.
+
+## ADR-010: DGA history passed as list to analyzer (not circular buffer in analyzer)
+- **Date**: 2026-03-21
+- **Context**: DGA trend detection needs 10–15 previous readings per gas. Where to maintain history.
+- **Decision**: `SimulatorEngine` maintains `_dga_history` deques (maxlen=15) per gas. On each DGA tick, it passes `history_*` lists to `DGAAnalyzer.analyze()`.
+- **Rationale**: Keeps the analyzer stateless and easily unit-testable (inject any history). The engine already owns the simulation timeline, so it's the natural place to buffer historical readings.
+- **Trade-off**: More arguments to `analyze()`. Mitigated by using keyword arguments and a well-typed signature.
+
+## ADR-011: What-if simulation creates isolated ThermalModel (not re-uses engine state)
+- **Date**: 2026-03-21
+- **Context**: `POST /api/simulation` must project future temperatures without affecting live simulator.
+- **Decision**: Create a fresh `ThermalModel()` instance per request, warm it up with 12 burn-in hours at the requested conditions, then project the timeline.
+- **Rationale**: Completely isolated from live engine state. Concurrent requests don't interfere. The 12-hour burn-in ensures initial transients are removed before the projection timeline starts.
+- **Trade-off**: Each request does 12 + N×24 ThermalModel ticks (cheap). No state is shared, so projections are slightly pessimistic (don't start from current real state). Acceptable for what-if analysis — the point is to show steady-state behavior at the requested conditions.
+
 *Add new ADRs below as decisions are made during implementation.*

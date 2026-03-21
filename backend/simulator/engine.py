@@ -3,10 +3,13 @@ TransformerTwin — SimulatorEngine: main async loop and tick dispatcher.
 
 Wires all physics models together and emits sensor/scenario updates
 to registered callbacks (WebSocket broadcaster, database writer, etc.).
+
+Phase 2.6: analytics modules (anomaly, DGA, FMEA, health) wired in.
 """
 
 import asyncio
 import logging
+from collections import deque
 from datetime import datetime, timezone
 
 from config import (
@@ -21,14 +24,19 @@ from config import (
     THERMAL_SENSOR_IDS,
     EQUIPMENT_SENSOR_IDS,
     DIAGNOSTIC_SENSOR_IDS,
+    HEALTH_UPDATE_THRESHOLD,
 )
-from models.schemas import TransformerState
+from models.schemas import TransformerState, AlertSchema
 from scenarios.manager import ScenarioManager
 from simulator.load_profile import get_load_fraction, get_ambient_temp
 from simulator.thermal_model import ThermalModel
 from simulator.equipment_model import EquipmentModel
 from simulator.dga_model import DGAModel
 from simulator.noise import add_noise
+from analytics.anomaly_detector import AnomalyDetector
+from analytics.dga_analyzer import DGAAnalyzer
+from analytics.fmea_engine import FMEAEngine
+from analytics.health_score import HealthScoreCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +46,30 @@ _DIAG_NOMINALS: dict[str, float] = {
     "OIL_DIELECTRIC": 55.0,
     "BUSHING_CAP_HV": 500.0,
     "BUSHING_CAP_LV": 420.0,
+}
+
+# Number of DGA history entries to keep for trend analysis
+_DGA_HISTORY_LEN: int = 15
+
+# Alert severity map: SensorStatus → AlertSeverity (no CAUTION in alerts)
+_STATUS_TO_ALERT_SEVERITY: dict[str, str] = {
+    "CAUTION":  "INFO",
+    "WARNING":  "WARNING",
+    "CRITICAL": "CRITICAL",
+}
+
+# Sensor-to-human-readable name for alert titles
+_SENSOR_NAMES: dict[str, str] = {
+    "TOP_OIL_TEMP":  "Top Oil Temperature",
+    "BOT_OIL_TEMP":  "Bottom Oil Temperature",
+    "WINDING_TEMP":  "Winding Hot Spot Temperature",
+    "DGA_H2":        "Hydrogen (H2)",
+    "DGA_CH4":       "Methane (CH4)",
+    "DGA_C2H6":      "Ethane (C2H6)",
+    "DGA_C2H4":      "Ethylene (C2H4)",
+    "DGA_C2H2":      "Acetylene (C2H2)",
+    "DGA_CO":        "Carbon Monoxide (CO)",
+    "DGA_CO2":       "Carbon Dioxide (CO2)",
 }
 
 
@@ -86,6 +118,14 @@ class SimulatorEngine:
 
     Each tick advances sim_time by (tick_interval × speed_multiplier) seconds.
     Sensor groups fire at their own intervals; see config.py for values.
+
+    Phase 2.6 additions:
+    - AnomalyDetector runs on every thermal + DGA group update
+    - DGAAnalyzer runs whenever the DGA group updates
+    - FMEAEngine + HealthScoreCalculator run on every thermal tick
+    - health_update emitted when score delta >= HEALTH_UPDATE_THRESHOLD
+    - alert emitted for each new/escalated anomaly
+    - Sensor readings + health scores + alerts persisted to SQLite
     """
 
     def __init__(self, speed_multiplier: int = 1) -> None:
@@ -101,8 +141,35 @@ class SimulatorEngine:
         self.dga_model: DGAModel = DGAModel()
         self.scenario_manager: ScenarioManager = ScenarioManager()
 
+        # Analytics modules
+        self.anomaly_detector: AnomalyDetector = AnomalyDetector()
+        self.dga_analyzer: DGAAnalyzer = DGAAnalyzer()
+        self.fmea_engine: FMEAEngine = FMEAEngine()
+        self.health_calculator: HealthScoreCalculator = HealthScoreCalculator()
+
         # Current transformer state
         self.state: TransformerState = TransformerState()
+
+        # Latest analytics results (read by REST routes)
+        self.latest_dga_analysis: dict = {}
+        self.latest_fmea_result: list[dict] = []
+        self.latest_health_result: dict = {
+            "overall_score": 100.0,
+            "status": "GOOD",
+            "components": {},
+        }
+        self.latest_anomalies: list[dict] = []
+
+        # Health tracking for delta-based emit
+        self._last_health_score_emitted: float = 100.0
+
+        # DGA history buffers for trend analysis (deque of float, newest last)
+        self._dga_history: dict[str, deque[float]] = {
+            sid: deque(maxlen=_DGA_HISTORY_LEN) for sid in DGA_SENSOR_IDS
+        }
+
+        # Auto-increment alert counter (used as fallback before DB assigns real ID)
+        self._alert_seq: int = 0
 
         # Last sim_time at which each sensor group was emitted
         self._last_thermal_emit: float = -THERMAL_UPDATE_INTERVAL_SIM_S
@@ -115,6 +182,7 @@ class SimulatorEngine:
         self._health_callbacks: list = []
         self._alert_callbacks: list = []
         self._scenario_callbacks: list = []
+        self._persist_callbacks: list = []
 
     # ------------------------------------------------------------------
     # Public control API
@@ -144,6 +212,10 @@ class SimulatorEngine:
     def register_scenario_callback(self, cb) -> None:  # noqa: ANN001
         """Register a coroutine to be called on scenario progress updates."""
         self._scenario_callbacks.append(cb)
+
+    def register_persist_callback(self, cb) -> None:  # noqa: ANN001
+        """Register a coroutine called after analytics for DB persistence."""
+        self._persist_callbacks.append(cb)
 
     def get_current_state(self) -> TransformerState:
         """Return the current TransformerState snapshot.
@@ -181,7 +253,7 @@ class SimulatorEngine:
     # ------------------------------------------------------------------
 
     async def _tick(self) -> None:
-        """Advance simulation by one tick: physics → state → callbacks."""
+        """Advance simulation by one tick: physics -> state -> analytics -> callbacks."""
         dt_s = float(self.speed) * self.tick_interval
 
         # --- 1. Lazy init: set thermal model to steady state on first tick ---
@@ -242,7 +314,7 @@ class SimulatorEngine:
 
         # DGA (noise applied separately; clamp to >= 0 in DGAModel)
         for gas_id in DGA_SENSOR_IDS:
-            field = gas_id.lower()  # e.g. DGA_H2 → dga_h2
+            field = gas_id.lower()  # e.g. DGA_H2 -> dga_h2
             clean_val = dga.gas_ppm[gas_id]
             noisy = max(0.0, add_noise(gas_id, clean_val))
             setattr(self.state, field, noisy)
@@ -275,25 +347,228 @@ class SimulatorEngine:
         # --- 10. Emit sensor group updates at their scheduled intervals ---
         now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-        if self.sim_time - self._last_thermal_emit >= THERMAL_UPDATE_INTERVAL_SIM_S:
+        thermal_due = self.sim_time - self._last_thermal_emit >= THERMAL_UPDATE_INTERVAL_SIM_S
+        equip_due   = self.sim_time - self._last_equip_emit   >= EQUIPMENT_UPDATE_INTERVAL_SIM_S
+        dga_due     = self.sim_time - self._last_dga_emit     >= DGA_UPDATE_INTERVAL_SIM_S
+        diag_due    = self.sim_time - self._last_diag_emit    >= DIAGNOSTIC_UPDATE_INTERVAL_SIM_S
+
+        if thermal_due:
             await self._emit_sensor_group("thermal", now_iso)
             self._last_thermal_emit = self.sim_time
 
-        if self.sim_time - self._last_equip_emit >= EQUIPMENT_UPDATE_INTERVAL_SIM_S:
+            # Anomaly detection on thermal sensors
+            thermal_anomalies = self.anomaly_detector.evaluate(self.state, "thermal")
+            self.latest_anomalies = thermal_anomalies
+
+            # Emit alerts for new/escalated anomalies
+            for anomaly in thermal_anomalies:
+                if anomaly.get("is_new") or anomaly.get("is_escalated"):
+                    await self._emit_anomaly_alert(anomaly, now_iso)
+
+        if equip_due:
             await self._emit_sensor_group("equipment", now_iso)
             self._last_equip_emit = self.sim_time
 
-        if self.sim_time - self._last_dga_emit >= DGA_UPDATE_INTERVAL_SIM_S:
+        if dga_due:
             await self._emit_sensor_group("dga", now_iso)
             self._last_dga_emit = self.sim_time
 
-        if self.sim_time - self._last_diag_emit >= DIAGNOSTIC_UPDATE_INTERVAL_SIM_S:
+            # Update DGA history buffers for trend analysis
+            for gas_id in DGA_SENSOR_IDS:
+                val = float(getattr(self.state, gas_id.lower(), 0.0))
+                self._dga_history[gas_id].append(val)
+
+            # Anomaly detection on DGA sensors
+            dga_anomalies = self.anomaly_detector.evaluate(self.state, "dga")
+            self.latest_anomalies = self.latest_anomalies + dga_anomalies
+
+            # Full DGA analysis
+            self.latest_dga_analysis = self.dga_analyzer.analyze(
+                h2=self.state.dga_h2,
+                ch4=self.state.dga_ch4,
+                c2h6=self.state.dga_c2h6,
+                c2h4=self.state.dga_c2h4,
+                c2h2=self.state.dga_c2h2,
+                co=self.state.dga_co,
+                co2=self.state.dga_co2,
+                history_h2=list(self._dga_history["DGA_H2"]),
+                history_ch4=list(self._dga_history["DGA_CH4"]),
+                history_c2h4=list(self._dga_history["DGA_C2H4"]),
+                history_c2h2=list(self._dga_history["DGA_C2H2"]),
+                history_co=list(self._dga_history["DGA_CO"]),
+                history_co2=list(self._dga_history["DGA_CO2"]),
+                history_c2h6=list(self._dga_history["DGA_C2H6"]),
+            )
+
+            # Emit DGA anomaly alerts
+            for anomaly in dga_anomalies:
+                if anomaly.get("is_new") or anomaly.get("is_escalated"):
+                    await self._emit_anomaly_alert(anomaly, now_iso)
+
+        if diag_due:
             await self._emit_sensor_group("diagnostic", now_iso)
             self._last_diag_emit = self.sim_time
 
-        # Always emit scenario update during active (non-normal) scenarios
+        # --- 11. FMEA + Health score on every thermal tick ---
+        if thermal_due:
+            all_anomalies = self.latest_anomalies
+            self.latest_fmea_result = self.fmea_engine.evaluate(
+                state=self.state,
+                dga_analysis=self.latest_dga_analysis,
+                anomalies=all_anomalies,
+            )
+            health_result = self.health_calculator.compute(
+                state=self.state,
+                dga_analysis=self.latest_dga_analysis,
+                anomalies=all_anomalies,
+            )
+            self.latest_health_result = health_result
+
+            # Emit health_update if score changed by >= threshold
+            new_score = health_result["overall_score"]
+            delta = abs(new_score - self._last_health_score_emitted)
+            if delta >= HEALTH_UPDATE_THRESHOLD:
+                await self._emit_health_update(health_result, new_score, now_iso)
+                self._last_health_score_emitted = new_score
+
+                # Persist health score snapshot
+                await self._fire_callbacks(
+                    self._persist_callbacks,
+                    {
+                        "type": "persist_health",
+                        "overall_score": new_score,
+                        "sim_time": self.sim_time,
+                        "timestamp": now_iso,
+                    },
+                )
+
+        # --- 12. Persist sensor readings (thermal + DGA groups) ---
+        if thermal_due:
+            for sid in THERMAL_SENSOR_IDS:
+                value, status = self._get_sensor_value_and_status(sid)
+                await self._fire_callbacks(
+                    self._persist_callbacks,
+                    {
+                        "type": "persist_sensor",
+                        "sensor_id": sid,
+                        "value": value,
+                        "status": status,
+                        "sim_time": self.sim_time,
+                        "timestamp": now_iso,
+                    },
+                )
+        if dga_due:
+            for sid in DGA_SENSOR_IDS:
+                value, status = self._get_sensor_value_and_status(sid)
+                await self._fire_callbacks(
+                    self._persist_callbacks,
+                    {
+                        "type": "persist_sensor",
+                        "sensor_id": sid,
+                        "value": value,
+                        "status": status,
+                        "sim_time": self.sim_time,
+                        "timestamp": now_iso,
+                    },
+                )
+
+        # --- 13. Scenario updates during active scenarios ---
         if scenario.scenario_id != "normal":
             await self._emit_scenario_update(now_iso)
+
+    # ------------------------------------------------------------------
+    # Analytics emission helpers
+    # ------------------------------------------------------------------
+
+    async def _emit_anomaly_alert(self, anomaly: dict, timestamp: str) -> None:
+        """Build and broadcast an alert message for an anomaly.
+
+        Args:
+            anomaly: Anomaly dict from AnomalyDetector.
+            timestamp: ISO 8601 UTC timestamp string.
+        """
+        self._alert_seq += 1
+        sensor_id = anomaly["sensor_id"]
+        status = anomaly["status"]
+        severity = _STATUS_TO_ALERT_SEVERITY.get(status, "INFO")
+        sensor_name = _SENSOR_NAMES.get(sensor_id, sensor_id)
+        actual = anomaly.get("actual", 0.0)
+        expected = anomaly.get("expected", 0.0)
+        deviation_pct = anomaly.get("deviation_pct", 0.0)
+        unit = SENSOR_UNITS.get(sensor_id, "")
+
+        title = f"{sensor_name} Anomaly Detected"
+        description = (
+            f"{sensor_name} is {deviation_pct:.1f}% above expected value. "
+            f"Actual: {actual}{unit}, Expected: {expected}{unit}."
+        )
+
+        alert_dict = {
+            "type": "alert",
+            "alert": {
+                "id": self._alert_seq,
+                "timestamp": timestamp,
+                "severity": severity,
+                "title": title,
+                "description": description,
+                "source": "ANOMALY_ENGINE",
+                "sensor_ids": [sensor_id],
+                "failure_mode_id": None,
+                "recommended_actions": [],
+                "acknowledged": False,
+                "acknowledged_at": None,
+                "sim_time": self.sim_time,
+            },
+        }
+
+        await self._fire_callbacks(self._alert_callbacks, alert_dict)
+
+        # Persist to DB via persist callback
+        alert_schema = AlertSchema(
+            id=self._alert_seq,
+            timestamp=timestamp,
+            severity=severity,  # type: ignore[arg-type]
+            title=title,
+            description=description,
+            source="ANOMALY_ENGINE",  # type: ignore[arg-type]
+            sensor_ids=[sensor_id],
+            failure_mode_id=None,
+            recommended_actions=[],
+            acknowledged=False,
+            acknowledged_at=None,
+            sim_time=self.sim_time,
+        )
+        await self._fire_callbacks(
+            self._persist_callbacks,
+            {"type": "persist_alert", "alert": alert_schema},
+        )
+
+    async def _emit_health_update(
+        self, health_result: dict, new_score: float, timestamp: str
+    ) -> None:
+        """Broadcast a health_update WebSocket message.
+
+        Args:
+            health_result: Dict from HealthScoreCalculator.compute().
+            new_score: New overall score.
+            timestamp: ISO 8601 UTC timestamp.
+        """
+        components_out: dict[str, dict] = {}
+        for key, comp in health_result.get("components", {}).items():
+            components_out[key] = {
+                "status": comp["status"],
+                "contribution": comp["contribution"],
+            }
+
+        message = {
+            "type": "health_update",
+            "timestamp": timestamp,
+            "sim_time": self.sim_time,
+            "overall_score": round(new_score, 1),
+            "previous_score": round(self._last_health_score_emitted, 1),
+            "components": components_out,
+        }
+        await self._fire_callbacks(self._health_callbacks, message)
 
     # ------------------------------------------------------------------
     # Emission helpers
@@ -323,6 +598,14 @@ class SimulatorEngine:
                 "unit": SENSOR_UNITS.get(sid, ""),
                 "status": status,
             }
+
+        # Add `expected` field for thermal sensors (rolling mean from anomaly detector)
+        if group == "thermal":
+            for sid in ("TOP_OIL_TEMP", "BOT_OIL_TEMP", "WINDING_TEMP"):
+                if sid in sensors:
+                    hist = list(self.anomaly_detector._history.get(sid, []))
+                    if len(hist) >= 5:
+                        sensors[sid]["expected"] = round(sum(hist) / len(hist), 1)
 
         message = {
             "type": "sensor_update",

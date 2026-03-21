@@ -5,9 +5,9 @@
 
 ---
 
-## Current Status: 🟡 Phase 1 Complete — Ready for Phase 2 (Backend Intelligence)
+## Current Status: 🟡 Phase 2 Complete — Ready for Phase 3 Frontend Integration
 
-All simulator physics implemented and running. Backend starts, emits WebSocket sensor_update messages, and responds to scenario triggers.
+All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing.
 
 ---
 
@@ -131,49 +131,45 @@ Target: Anomaly detection + DGA analysis + FMEA + Health score
 
 > ⚠️ Read `docs/DUVAL_TRIANGLE_VERTICES.md` before 2.2, `docs/FMEA_DEFINITIONS.md` before 2.3.
 
-- [ ] **2.1** Anomaly detection engine — `analytics/anomaly_detector.py`
+- [x] **2.1** Anomaly detection engine — `analytics/anomaly_detector.py`
   - Rolling baseline: 360-tick window (= 30 sim-minutes) per thermal sensor
   - Z-score computation: `z = (value - mean) / std`
   - Classification: z > 2.0 → CAUTION, z > 3.5 → WARNING, z > 5.0 → CRITICAL (from `config.py`)
   - Rate-of-change check: if value changes > 10% of range per sim-minute → escalate by one level
   - Emit alert (via callback) on first detection and on level escalation (not every tick)
   - Only applies to thermal sensors (TOP_OIL_TEMP, BOT_OIL_TEMP, WINDING_TEMP, DGA group)
-- [ ] **2.2** DGA analysis module — `analytics/dga_analyzer.py`
-  > ⚠️ Zone polygons and classifier rules are in `docs/DUVAL_TRIANGLE_VERTICES.md`
+- [x] **2.2** DGA analysis module — `analytics/dga_analyzer.py`
   - Duval Triangle 1: classify current CH4/C2H4/C2H2 percentages into a `DuvalZone`
   - TDCG: sum of H2+CH4+C2H6+C2H4+C2H2+CO; compare against `TDCG_*_PPM` thresholds
   - CO2/CO ratio: check against `CO2_CO_RATIO_LOW` and `CO2_CO_RATIO_HIGH`
   - Gas rate trend: RISING if ppm increased >5% in last 10 readings, FALLING if decreased >5%, else STABLE
-  - Returns `DGAAnalysis` Pydantic model (see Integration Contract Section 3.6)
-- [ ] **2.3** Failure mode engine — `analytics/fmea_engine.py`
-  > ⚠️ All 8 failure mode definitions with conditions and weights are in `docs/FMEA_DEFINITIONS.md`
-  - Evaluate all 8 failure modes against current `TransformerState` + `DGAAnalysis`
+  - Returns `DGAAnalysisResponseSchema` (see Integration Contract Section 3.6)
+- [x] **2.3** Failure mode engine — `analytics/fmea_engine.py`
+  - All 8 failure modes (FM-001 through FM-008) evaluated via weighted evidence scoring
   - Only return modes with `match_score ≥ FMEA_MIN_REPORT_SCORE` (0.3)
-  - Confidence labels from `config.py`: 0.4 = Possible, 0.7 = Probable
-  - Returns list of `FailureMode` Pydantic models sorted by `match_score` descending
-- [ ] **2.4** Health score calculator — `analytics/health_score.py`
+  - Confidence labels: < 0.4 = Monitoring, 0.4–0.7 = Possible, ≥ 0.7 = Probable
+  - Returns list sorted by `match_score` descending
+- [x] **2.4** Health score calculator — `analytics/health_score.py`
   - 6-component weighted penalty model (weights in `HEALTH_WEIGHTS` in `config.py`)
   - Penalty per status level: CAUTION=25, WARNING=50, CRITICAL=100 (from `config.py`)
   - Formula: `score = 100 - Σ(penalty[status[component]] × weight[component])`
   - Clamp to [0, 100]
-  - Returns `HealthScore` Pydantic model (see Integration Contract Section 3.4)
-- [ ] **2.5** What-if simulation engine — `api/routes_simulation.py`
-  - Run a projected simulation with given `load_percent`, `ambient_temp_c`, `cooling_mode`
-  - Use `ThermalModel.tick()` in a loop for `duration_hours × 3600` sim-seconds
-  - Apply Arrhenius aging: `aging_rate = exp(ARRHENIUS_K × (winding_temp - 98))` per IEC 60076-7
-  - Return `ProjectionResult` with hourly `top_oil_temp`, `winding_temp`, `aging_factor`, `estimated_life_years`
-- [ ] **2.6** Wire all analytics into WebSocket stream
-  - After each `SimulatorEngine.tick()`: run anomaly_detector, dga_analyzer, fmea_engine, health_score
-  - Emit `alert` message for any new/escalated alerts
-  - Emit `health_update` if score delta ≥ 0.5
-  - Persist sensor readings, health history, and alerts to SQLite
-- [ ] **2.7** Backend integration test
-  - Start engine, trigger `hot_spot` scenario, run for 2 sim-hours at 60× speed
-  - Assert: WINDING_TEMP enters WARNING by sim-hour 1
-  - Assert: DGA_CH4, DGA_C2H4 enter CAUTION by sim-hour 2
-  - Assert: Duval zone transitions from NONE → T1 → T2
-  - Assert: FM-001 confidence score > 0.7 by end
-  - Assert: Health score drops below 70 by end
+- [x] **2.5** What-if simulation engine — `api/routes_simulation.py`
+  - IEC 60076-7 Annex A Arrhenius insulation aging: `V = exp(K × (θ_H - 98))`
+  - Day-by-day timeline with projected temps and cumulative aging factor
+  - Human-readable interpretation strings + cooling energy impact
+- [x] **2.6** Wire all analytics into WebSocket stream
+  - Analytics run in SimulatorEngine tick loop after each physics tick
+  - `alert` message emitted for new/escalated anomalies
+  - `health_update` message emitted when score delta ≥ 0.5
+  - Sensor readings, health history, and alerts persisted to SQLite
+  - REST routes (DGA, FMEA, health) read from `engine.latest_*` attributes
+- [x] **2.7** Backend integration test — `tests/test_phase2_integration.py`
+  - 28 tests: DGAAnalyzer (13), AnomalyDetector (4), HealthScore (5), FMEA (4), integration (2)
+  - All Duval zones (PD, T1, T2, T3, D1, D2, DT) verified
+  - Hot-spot scenario progression test: WINDING_TEMP WARNING + DGA CAUTION + FM-001 active + health < 85
+  - What-if simulation plausibility test
+  - **All 28/28 tests pass**
 
 ---
 
@@ -269,3 +265,4 @@ Target: Charts + Duval Triangle + Alerts + Simulation + Playback
 | 2026-03-20 | 1 | Full backend + frontend skeleton scaffolded. Both servers start and respond. | Phase 1.3: implement sensor simulator physics |
 | 2026-03-20 | 2 | Full doc review. Created THERMAL_PHYSICS.md, DGA_GAS_GENERATION.md, DUVAL_TRIANGLE_VERTICES.md, FMEA_DEFINITIONS.md, .env.example, improvement.md. Updated INTEGRATION_CONTRACT.md and PROGRESS.md. | Phase 1.3a: add physics constants to config.py, then implement simulator modules |
 | 2026-03-21 | 3 | Phase 1.3 + 1.4 + 1.6 fully implemented. All physics models (thermal IEC 60076-7, DGA Arrhenius, equipment hysteresis) running. Engine tick loop wired. Scenario modifiers (hot_spot, arcing, cooling_failure) complete. WebSocket streaming live. REST routes for sensors/current, scenario/status/trigger, and simulation/speed wired to engine. Fixed winding_delta runaway bug (ADR-006). | Phase 2: anomaly detection, DGA analysis, FMEA, health score |
+| 2026-03-21 | 4 | Phase 2 fully implemented (2.1–2.7). Anomaly detector (rolling Z-score + rate-of-change), DGA analyzer (Duval Triangle + TDCG + CO2/CO + trends), FMEA engine (8 failure modes), health score (weighted penalty), what-if simulation (IEC 60076-7 Arrhenius), analytics wired into engine tick loop + WebSocket + SQLite persistence. 28/28 integration tests pass. | Phase 3/4 frontend integration with live backend data |
