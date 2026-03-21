@@ -1,11 +1,28 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 11 — Simulation quality + visual urgency improvements)
+> Last updated: 2026-03-21 (Session 12 — Decision Support System + speed improvements)
 
 ---
 
-## Current Status: 🟢 Session 11 Complete — 2 new scenarios, FMEA alerts, operator UX improvements
+## Current Status: 🟢 Session 12 Complete — Decision Support Panel, 200x speed, actionable anomaly alerts
+
+### Session 12 Additions (2026-03-21)
+- **Speed options expanded**: Now supports 1×, 10×, 30×, 60×, 100×, 200× (was capped at 60×). At 200× you can watch a full 3-hour fault scenario in 54 real seconds.
+- **Actionable anomaly alerts**: Every sensor anomaly alert now includes sensor-specific step-by-step recommended actions (9 sensors covered: thermal and all DGA gases). Previously `recommended_actions` was always `[]`.
+- **Decision Support System** — the centerpiece real-world use case feature:
+  - `backend/analytics/decision_engine.py`: New `DecisionEngine` class computing risk, RUL, economics, and runbooks
+  - `backend/api/routes_decision.py`: `GET /api/decision` REST endpoint
+  - `backend/config.py`: Economic constants (transformer replacement $3.2M, outage $85k/day, maintenance $12k)
+  - `frontend/src/types/decision.ts`: Full TypeScript types for decision response
+  - `frontend/src/components/panels/DecisionPanel.tsx`: New tab panel with 4 sections
+  - Polling: `fetchDecision()` called on mount + every 5s alongside DGA/FMEA
+- **Decision Panel sections**:
+  1. **Asset Risk Assessment**: 5-dot visual risk meter (NOMINAL/LOW/MEDIUM/HIGH/CRITICAL), risk description
+  2. **Recommended Action**: Specific action with deadline and business reasoning
+  3. **Economic Impact Analysis**: 3-scenario cost table (Act Now ~$16k / Delay 14d ~$220k / Failure ~$3.8M) with potential savings
+  4. **Operator Runbooks**: Per-fault step-by-step procedures (8 runbooks for FM-001 through FM-008) with interactive checkboxes, progress bar, and procedure ID
+- **Tab indicator**: Decision tab shows orange/yellow dot when risk is MEDIUM or higher
 
 All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing. 125/125 frontend tests passing.
 
@@ -313,3 +330,4 @@ Target: Vitest + React Testing Library — per CLAUDE.md spec (was the only unim
 | 2026-03-21 | 7 | Visual QA via Playwright MCP. Ran full 15-section TEST_PLAN.md. Found and fixed: DGA+FMEA never fetched (added REST polling in App.tsx + useApi.ts), FAN_BANK showing "0.0" instead of ON/OFF (SensorRow.tsx), Duval zone labels outside triangle (centroid Y sign bug in DuvalTriangle.tsx), speed button active state not visible (added ring highlight), What-If missing cooling energy row (added card to WhatIfPanel.tsx), FMEA/Alert empty states had no icons (added SVG icons). All fixes verified with screenshots. | Frontend unit tests |
 | 2026-03-21 | 8 | Phase 6: Frontend unit tests. Installed Vitest, configured vite.config.ts. Wrote 3 test files (125 tests total): duval-geometry.test.ts (53 — coord transforms, zone classification per IEC 60599), formatters.test.ts (35 — all format functions), store.test.ts (37 — actions, ring buffer, health labels, alert dedup, DGA trail cap). All 125/125 pass. Frontend build still clean. | Project fully complete |
 | 2026-03-21 | 9 | Comprehensive Playwright MCP QA of all 12 feature areas. Found and fixed 3 critical bugs: (1) HealthGauge + HealthBreakdown never rendered — added to TabContainer as always-visible strip; (2) anomaly detector min_std floor too small (1e-9) causing 1400+ alert flood — fixed to 1% of sensor range; (3) historical playback snapshot route not registered because backend was started without --reload before route was added — restarted backend. All features now verified: WebSocket, header controls, 3D model, 21 sensors + sparklines, health gauge/breakdown, DGA/Duval Triangle, FMEA, What-If, alerts, hot-spot scenario, arcing scenario, playback scrubber. ADR-019, ADR-020 logged. ISSUE-017, ISSUE-018, ISSUE-019 resolved. | Project fully demo-ready |
+| 2026-03-21 | 12 | Decision Support System. Added 100×/200× speed options. Added per-sensor recommended_actions to anomaly alerts. Created DecisionEngine (risk, RUL, economic impact, runbooks) + GET /api/decision + DecisionPanel frontend tab. Decision panel shows: risk assessment (5-dot visual), recommended action with deadline, 3-scenario economic impact table ($16k now vs $3.8M failure), 8 operator runbooks with interactive checkboxes. Frontend build clean (tsc + vite). Backend imports verified. | Deploy and demo |

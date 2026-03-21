@@ -60,3 +60,10 @@ export async function fetchFMEA(): Promise<void> {
   const store = useStore.getState()
   store.setFMEAResponse(data)
 }
+
+/** Fetches decision support analysis (risk, economics, runbooks) and stores it */
+export async function fetchDecision(): Promise<void> {
+  const data = await api.getDecision()
+  const store = useStore.getState()
+  store.setDecision(data)
+}

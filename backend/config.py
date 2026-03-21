@@ -15,8 +15,8 @@ TICK_INTERVAL_SECONDS: float = 1.0
 # Minimum speed multiplier (real-time)
 MIN_SPEED_MULTIPLIER: int = 1
 
-# Maximum speed multiplier (60 sim-minutes per real minute)
-MAX_SPEED_MULTIPLIER: int = 60
+# Maximum speed multiplier (200× = full 6-hour fault scenario in ~2 real minutes)
+MAX_SPEED_MULTIPLIER: int = 200
 
 # ---------------------------------------------------------------------------
 # Sensor update intervals (in simulation seconds)
@@ -425,3 +425,53 @@ LOAD_WEEKEND_MAX_FRACTION: float = 0.65  # 65% max on weekends
 AMBIENT_MIN_C: float = 15.0   # °C at night trough
 AMBIENT_MAX_C: float = 35.0   # °C at afternoon peak
 AMBIENT_PEAK_HOUR: float = 15.0  # Hour of day at peak ambient (3 PM)
+
+# ---------------------------------------------------------------------------
+# Economic impact constants — Decision Engine
+# Based on industry averages for large power transformers (≥100 MVA)
+# Sources: CIGRE WG A2.34, NERC Reliability Standards, utility case studies
+# ---------------------------------------------------------------------------
+
+# Transformer replacement cost (USD).
+# Large 100 MVA autotransformer: $2.5M–$5M. Using $3.2M as representative value.
+ECONOMIC_TRANSFORMER_REPLACEMENT_USD: float = 3_200_000.0
+
+# Unplanned outage cost per day (USD).
+# Combines: lost energy revenue (~$50k/day at typical wholesale rates),
+# regulatory penalties ($15k/day), emergency crew dispatch ($5k/day),
+# and customer compensation costs (~$15k/day average for industrial utility).
+ECONOMIC_OUTAGE_COST_PER_DAY_USD: float = 85_000.0
+
+# Planned maintenance cost (USD).
+# Scheduled 2–4 hour maintenance window: crew ($3k), oil sampling ($1k),
+# inspection labor ($5k), parts/consumables ($3k). Total ≈ $12k.
+ECONOMIC_PLANNED_MAINTENANCE_USD: float = 12_000.0
+
+# Production loss per planned maintenance hour (USD).
+# Planned outage at off-peak can be as low as $2.1k/hr (vs $85k/day unplanned).
+# 2-hour maintenance window = $4,200 typical.
+ECONOMIC_MAINTENANCE_PRODUCTION_LOSS_PER_HR_USD: float = 2_100.0
+
+# Planned maintenance window duration (hours) — typical for this class of work.
+ECONOMIC_MAINTENANCE_WINDOW_HRS: float = 2.0
+
+# Fault escalation factor for "act later" scenario.
+# At 14-day delay probability of requiring emergency repair vs planned is ~3×.
+ECONOMIC_DELAYED_ESCALATION_FACTOR: float = 3.5
+
+# Expected outage duration for emergency repair (hours).
+# Emergency repair without spare unit: typically 18–36 hours.
+ECONOMIC_EMERGENCY_REPAIR_HRS: float = 24.0
+
+# Expected outage duration if transformer requires replacement (days).
+# Average wait for a spare large transformer: 7–14 days.
+ECONOMIC_REPLACEMENT_OUTAGE_DAYS: float = 7.0
+
+# Risk thresholds for Decision Engine
+# Composite risk score (0.0–1.0) mapping to risk levels
+DECISION_RISK_LOW: float = 0.25
+DECISION_RISK_MEDIUM: float = 0.50
+DECISION_RISK_HIGH: float = 0.70
+
+# Hours of remaining useful life below which "act now" recommendation fires
+DECISION_ACT_NOW_THRESHOLD_HRS: float = 72.0

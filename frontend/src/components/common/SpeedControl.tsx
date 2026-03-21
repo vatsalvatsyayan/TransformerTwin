@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { useStore } from '../../store'
 import { api } from '../../lib/api'
 
-const SPEED_OPTIONS = [1, 10, 30, 60] as const
+const SPEED_OPTIONS = [1, 10, 30, 60, 100, 200] as const
 
 export const SpeedControl = memo(function SpeedControl() {
   const speedMultiplier = useStore((s) => s.speedMultiplier)

@@ -8,6 +8,7 @@ import type { DGAAnalysisResponse, DuvalResult } from '../types/dga'
 import type { FMEAResponse } from '../types/fmea'
 import type { ScenarioId } from '../types/scenario'
 import type { ConnectionState } from '../types/websocket'
+import type { DecisionResponse } from '../types/decision'
 
 /** Maximum history points kept per sensor in the in-memory ring buffer */
 export const SENSOR_HISTORY_BUFFER_SIZE = 720
@@ -51,6 +52,9 @@ export interface AppState {
   simTime: number
   wallClockTime: string | null
 
+  // --- Decision ---
+  decision: DecisionResponse | null
+
   // --- Playback ---
   mode: PlaybackMode
   playbackPosition: string | null
@@ -89,6 +93,7 @@ export interface AppState {
   exitPlayback: () => void
   setPlaybackPosition: (position: string) => void
   setIsPlaying: (playing: boolean) => void
+  setDecision: (decision: DecisionResponse) => void
 }
 
 export const useStore = create<AppState>()((set) => ({
@@ -115,6 +120,7 @@ export const useStore = create<AppState>()((set) => ({
   speedMultiplier: 1,
   simTime: 0,
   wallClockTime: null,
+  decision: null,
   mode: 'live',
   playbackPosition: null,
   isPlaying: false,
@@ -207,4 +213,5 @@ export const useStore = create<AppState>()((set) => ({
   exitPlayback: () => set({ mode: 'live', playbackPosition: null, isPlaying: false }),
   setPlaybackPosition: (position) => set({ playbackPosition: position }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
+  setDecision: (decision) => set({ decision }),
 }))

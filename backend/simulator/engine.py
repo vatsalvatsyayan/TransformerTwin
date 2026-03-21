@@ -72,6 +72,72 @@ _SENSOR_NAMES: dict[str, str] = {
     "DGA_CO2":       "Carbon Dioxide (CO2)",
 }
 
+# Per-sensor recommended actions for anomaly alerts.
+# These give operators immediate, concrete steps — not just "alert: temperature high".
+_ANOMALY_RECOMMENDED_ACTIONS: dict[str, list[str]] = {
+    "TOP_OIL_TEMP": [
+        "Check that Fan Bank 1 and Fan Bank 2 are running",
+        "Reduce transformer load to 70% or below",
+        "Verify oil flow in cooling radiators",
+        "Log reading and notify shift supervisor",
+    ],
+    "BOT_OIL_TEMP": [
+        "Inspect bottom oil drain valve for blockage",
+        "Verify cooling pump operation",
+        "Compare top/bottom oil differential — if >20°C, escalate to FM investigation",
+        "Log reading in operations log",
+    ],
+    "WINDING_TEMP": [
+        "Reduce load immediately — target <70% rated",
+        "Verify all cooling fans operational",
+        "Initiate emergency DGA oil sample within 4 hours",
+        "Contact transformer engineer if temperature exceeds 120°C",
+        "Prepare for possible planned outage",
+    ],
+    "DGA_H2": [
+        "Increase DGA sampling to daily",
+        "Check for partial discharge — review bushing capacitance readings",
+        "Review historical H2 trend for acceleration",
+        "If H2 > 700 ppm: consult transformer specialist",
+    ],
+    "DGA_CH4": [
+        "Cross-reference with C2H4 ratio for fault classification",
+        "Increase DGA monitoring frequency",
+        "Plot on Duval Triangle — check zone classification",
+        "If Duval zone is T2/T3: initiate thermal fault investigation",
+    ],
+    "DGA_C2H6": [
+        "Monitor for rising trend — C2H6 alone indicates low-temperature thermal fault",
+        "Increase DGA sampling frequency to weekly",
+        "Check load profile for sustained overloads",
+    ],
+    "DGA_C2H4": [
+        "C2H4 elevation indicates thermal fault ≥300°C",
+        "Initiate Winding Hot Spot investigation (FM-001)",
+        "Reduce transformer load immediately",
+        "Schedule thermal imaging of tank exterior",
+    ],
+    "DGA_C2H2": [
+        "CRITICAL: Acetylene indicates arcing — immediate action required",
+        "If C2H2 > 35 ppm: reduce load and prepare for outage",
+        "If C2H2 > 200 ppm: emergency shutdown may be required",
+        "Call control room and transformer engineer immediately",
+        "Do not increase load until root cause confirmed",
+    ],
+    "DGA_CO": [
+        "CO elevation indicates paper insulation degradation",
+        "Check CO2/CO ratio — ratio < 5 indicates active paper burning",
+        "Review transformer overload history",
+        "Schedule furanic compound oil test to assess remaining insulation life",
+    ],
+    "DGA_CO2": [
+        "Elevated CO2 may indicate overheated cellulose insulation",
+        "Calculate CO2/CO ratio — if < 5: urgent paper degradation risk",
+        "Review winding temperature trends",
+        "Schedule comprehensive oil analysis",
+    ],
+}
+
 
 def _compute_sensor_status(sensor_id: str, value: float) -> str:
     """Return the status string for a sensor value against its thresholds.
@@ -198,7 +264,7 @@ class SimulatorEngine:
         Args:
             multiplier: New time acceleration factor.
         """
-        self.speed = max(1, min(60, multiplier))
+        self.speed = max(1, min(200, multiplier))
         logger.info("Simulation speed set to %dx", self.speed)
 
     def register_sensor_callback(self, cb) -> None:  # noqa: ANN001
@@ -530,6 +596,8 @@ class SimulatorEngine:
             f"Deviation: {deviation_pct:.1f}%.{trend_text}"
         )
 
+        recommended_actions = _ANOMALY_RECOMMENDED_ACTIONS.get(sensor_id, [])
+
         alert_dict = {
             "type": "alert",
             "alert": {
@@ -541,7 +609,7 @@ class SimulatorEngine:
                 "source": "ANOMALY_ENGINE",
                 "sensor_ids": [sensor_id],
                 "failure_mode_id": None,
-                "recommended_actions": [],
+                "recommended_actions": recommended_actions,
                 "acknowledged": False,
                 "acknowledged_at": None,
                 "sim_time": self.sim_time,
@@ -560,7 +628,7 @@ class SimulatorEngine:
             source="ANOMALY_ENGINE",  # type: ignore[arg-type]
             sensor_ids=[sensor_id],
             failure_mode_id=None,
-            recommended_actions=[],
+            recommended_actions=recommended_actions,
             acknowledged=False,
             acknowledged_at=None,
             sim_time=self.sim_time,

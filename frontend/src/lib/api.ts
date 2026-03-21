@@ -6,6 +6,7 @@ import type { FMEAResponse } from '../types/fmea'
 import type { HealthResponse, HealthHistoryPoint } from '../types/health'
 import type { ScenarioStatusResponse, ScenarioTriggerResponse } from '../types/scenario'
 import type { SimulationRequest, SimulationResponse } from '../types/simulation'
+import type { DecisionResponse } from '../types/decision'
 import type { SensorId } from '../types/sensors'
 
 const BASE_URL = 'http://localhost:8001'
@@ -83,6 +84,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ speed_multiplier: multiplier }),
     }),
+
+  /** Return all sensor readings closest to (at or before) the given sim_time. */
+  getDecision: () => request<DecisionResponse>('/api/decision'),
 
   /** Return all sensor readings closest to (at or before) the given sim_time. */
   getSensorsSnapshot: (simTime: number) =>

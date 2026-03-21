@@ -6,17 +6,20 @@ import { DGAPanel } from './DGAPanel'
 import { FMEAPanel } from './FMEAPanel'
 import { WhatIfPanel } from './WhatIfPanel'
 import { AlertPanel } from './AlertPanel'
+import { DecisionPanel } from './DecisionPanel'
 import { useActiveAlertCount } from '../../store/selectors'
+import { useStore } from '../../store'
 import { HealthGauge } from '../health/HealthGauge'
 import { HealthBreakdown } from '../health/HealthBreakdown'
 import { ScenarioProgressBar } from '../common/ScenarioProgressBar'
 
-const TABS = ['Sensors', 'DGA', 'FMEA', 'What-If', 'Alerts'] as const
+const TABS = ['Sensors', 'DGA', 'FMEA', 'Decision', 'What-If', 'Alerts'] as const
 type Tab = (typeof TABS)[number]
 
 export const TabContainer = memo(function TabContainer() {
   const [activeTab, setActiveTab] = useState<Tab>('Sensors')
   const alertCount = useActiveAlertCount()
+  const decisionRisk = useStore((s) => s.decision?.risk_level)
 
   return (
     <div className="flex flex-col h-full">
@@ -38,6 +41,11 @@ export const TabContainer = memo(function TabContainer() {
                 {alertCount}
               </span>
             )}
+            {tab === 'Decision' && decisionRisk && decisionRisk !== 'NOMINAL' && decisionRisk !== 'LOW' && (
+              <span className={`ml-1 inline-flex items-center justify-center w-2 h-2 rounded-full ${
+                decisionRisk === 'CRITICAL' || decisionRisk === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'
+              }`} />
+            )}
           </button>
         ))}
       </div>
@@ -56,11 +64,12 @@ export const TabContainer = memo(function TabContainer() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto">
-        {activeTab === 'Sensors'  && <SensorPanel />}
-        {activeTab === 'DGA'      && <DGAPanel />}
-        {activeTab === 'FMEA'     && <FMEAPanel />}
-        {activeTab === 'What-If'  && <WhatIfPanel />}
-        {activeTab === 'Alerts'   && <AlertPanel />}
+        {activeTab === 'Sensors'   && <SensorPanel />}
+        {activeTab === 'DGA'       && <DGAPanel />}
+        {activeTab === 'FMEA'      && <FMEAPanel />}
+        {activeTab === 'Decision'  && <DecisionPanel />}
+        {activeTab === 'What-If'   && <WhatIfPanel />}
+        {activeTab === 'Alerts'    && <AlertPanel />}
       </div>
     </div>
   )

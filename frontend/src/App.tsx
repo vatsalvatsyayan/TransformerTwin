@@ -7,7 +7,7 @@ import { MainLayout } from './components/layout/MainLayout'
 import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore } from './store'
-import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA } from './hooks/useApi'
+import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA, fetchDecision } from './hooks/useApi'
 
 export default function App() {
   // Establish WebSocket connection (reconnects automatically)
@@ -23,6 +23,7 @@ export default function App() {
     // Alerts are NOT pre-loaded from DB — each page refresh starts with a clean alert state.
     // New alerts arrive via WebSocket and accumulate during the session.
     fetchDGAAnalysis().catch((err: unknown) => console.warn('[Init] DGA fetch failed:', err))
+    fetchDecision().catch((err: unknown) => console.warn('[Init] decision fetch failed:', err))
     fetchFMEA().catch((err: unknown) => console.warn('[Init] FMEA fetch failed:', err))
   }, [])
 
@@ -31,6 +32,7 @@ export default function App() {
     const id = setInterval(() => {
       fetchDGAAnalysis().catch(() => undefined)
       fetchFMEA().catch(() => undefined)
+      fetchDecision().catch(() => undefined)
     }, 5000)
     return () => clearInterval(id)
   }, [])
