@@ -10,6 +10,8 @@ const SCENARIO_OPTIONS: { id: ScenarioId; label: string }[] = [
   { id: 'hot_spot', label: 'Developing Hot Spot' },
   { id: 'arcing', label: 'Arcing Event' },
   { id: 'cooling_failure', label: 'Cooling Fan Failure' },
+  { id: 'partial_discharge', label: 'Partial Discharge' },
+  { id: 'paper_degradation', label: 'Paper Insulation Degradation' },
 ]
 
 export const ScenarioSelector = memo(function ScenarioSelector() {

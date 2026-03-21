@@ -1,13 +1,21 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 9 — Comprehensive Playwright QA + 3 critical bug fixes)
+> Last updated: 2026-03-21 (Session 11 — Simulation quality + visual urgency improvements)
 
 ---
 
-## Current Status: 🟢 Session 9 Complete — All features verified, 3 bugs fixed, fully demo-ready
+## Current Status: 🟢 Session 11 Complete — 2 new scenarios, FMEA alerts, operator UX improvements
 
-All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing.
+All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing. 125/125 frontend tests passing.
+
+### Session 11 Additions (2026-03-21)
+- **2 new fault scenarios**: Partial Discharge (CH4/H2 → Duval PD zone), Paper Insulation Degradation (CO/CO2 ratio decay)
+- **FMEA alert emission**: Engine now emits `FMEA_ENGINE` alerts when confidence escalates (Monitoring→Possible→Probable) with full `recommended_actions` list
+- **Richer anomaly descriptions**: Include current value, expected value, deviation %, and trend direction
+- **Expandable AlertPanel**: Click any alert to expand description + recommended actions; FMEA alerts get purple badge + colored left border
+- **ScenarioProgressBar**: Prominent color-coded strip (yellow→orange→red) above tab content during active fault simulations
+- **AlertToast**: Transient CRITICAL/WARNING overlay on 3D viewer with fade-slide animation (5s auto-dismiss)
 
 ---
 

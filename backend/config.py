@@ -240,18 +240,26 @@ SCENARIO_NORMAL: str = "normal"
 SCENARIO_HOT_SPOT: str = "hot_spot"
 SCENARIO_ARCING: str = "arcing"
 SCENARIO_COOLING_FAILURE: str = "cooling_failure"
+SCENARIO_PARTIAL_DISCHARGE: str = "partial_discharge"
+SCENARIO_PAPER_DEGRADATION: str = "paper_degradation"
 
 VALID_SCENARIO_IDS: tuple[str, ...] = (
     SCENARIO_NORMAL,
     SCENARIO_HOT_SPOT,
     SCENARIO_ARCING,
     SCENARIO_COOLING_FAILURE,
+    SCENARIO_PARTIAL_DISCHARGE,
+    SCENARIO_PAPER_DEGRADATION,
 )
 
 # Scenario durations in simulation seconds
 SCENARIO_HOT_SPOT_DURATION_S: int = 7200    # 2 sim-hours
 SCENARIO_ARCING_DURATION_S: int = 900        # 15 sim-minutes
 SCENARIO_COOLING_FAILURE_DURATION_S: int = 3600  # 1 sim-hour
+# Partial discharge: slow build over 2 sim-hours — CH4/H2 accumulate into PD zone
+SCENARIO_PARTIAL_DISCHARGE_DURATION_S: int = 7200
+# Paper degradation: long 3 sim-hour arc of CO/CO2 imbalance
+SCENARIO_PAPER_DEGRADATION_DURATION_S: int = 10800
 
 # ---------------------------------------------------------------------------
 # FMEA failure mode IDs (Integration Contract Section 1.7)

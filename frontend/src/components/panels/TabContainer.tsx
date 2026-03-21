@@ -9,6 +9,7 @@ import { AlertPanel } from './AlertPanel'
 import { useActiveAlertCount } from '../../store/selectors'
 import { HealthGauge } from '../health/HealthGauge'
 import { HealthBreakdown } from '../health/HealthBreakdown'
+import { ScenarioProgressBar } from '../common/ScenarioProgressBar'
 
 const TABS = ['Sensors', 'DGA', 'FMEA', 'What-If', 'Alerts'] as const
 type Tab = (typeof TABS)[number]
@@ -49,6 +50,9 @@ export const TabContainer = memo(function TabContainer() {
           <HealthBreakdown />
         </div>
       </div>
+
+      {/* Scenario progress — shown only during active fault simulations */}
+      <ScenarioProgressBar />
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto">

@@ -8,6 +8,7 @@ import { StatusLegend } from './StatusLegend'
 import { CameraResetButton } from './CameraResetButton'
 import { ComponentTooltip } from './ComponentTooltip'
 import { PartDetailPanel } from './PartDetailPanel'
+import { AlertToast } from './AlertToast'
 import type { PartId } from '../../types/parts'
 import { PART_META } from '../../types/parts'
 import { useStore } from '../../store'
@@ -103,6 +104,7 @@ export const TransformerScene = memo(function TransformerScene() {
 
       <StatusLegend />
       <CameraResetButton onReset={resetCamera} />
+      <AlertToast />
 
       {/* Hover tooltip */}
       {hoveredPart && (

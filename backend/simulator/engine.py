@@ -171,6 +171,10 @@ class SimulatorEngine:
         # Auto-increment alert counter (used as fallback before DB assigns real ID)
         self._alert_seq: int = 0
 
+        # Track last emitted FMEA alert confidence per failure mode ID.
+        # Used to emit alerts only when confidence escalates (avoids alert flood).
+        self._fmea_alert_confidence: dict[str, str] = {}
+
         # Last sim_time at which each sensor group was emitted
         self._last_thermal_emit: float = -THERMAL_UPDATE_INTERVAL_SIM_S
         self._last_equip_emit: float = -EQUIPMENT_UPDATE_INTERVAL_SIM_S
@@ -427,6 +431,22 @@ class SimulatorEngine:
             )
             self.latest_health_result = health_result
 
+            # Emit FMEA alerts when confidence escalates
+            active_fm_ids: set[str] = set()
+            for mode in self.latest_fmea_result:
+                fm_id = mode["id"]
+                confidence = mode["confidence_label"]
+                active_fm_ids.add(fm_id)
+                prev_confidence = self._fmea_alert_confidence.get(fm_id, "")
+                # Emit on first arrival at Possible/Probable, or escalation to Probable
+                if confidence in ("Possible", "Probable") and confidence != prev_confidence:
+                    await self._emit_fmea_alert(mode, now_iso)
+                    self._fmea_alert_confidence[fm_id] = confidence
+            # Reset tracking for failure modes that dropped below report threshold
+            for fm_id in list(self._fmea_alert_confidence):
+                if fm_id not in active_fm_ids:
+                    del self._fmea_alert_confidence[fm_id]
+
             # Emit health_update if score changed by >= threshold
             new_score = health_result["overall_score"]
             delta = abs(new_score - self._last_health_score_emitted)
@@ -500,10 +520,14 @@ class SimulatorEngine:
         deviation_pct = anomaly.get("deviation_pct", 0.0)
         unit = SENSOR_UNITS.get(sensor_id, "")
 
-        title = f"{sensor_name} Anomaly Detected"
+        trend = anomaly.get("trend", "STABLE")
+        trend_text = " Trend: rising rapidly." if trend == "RISING" else ""
+
+        title = f"{sensor_name} — {status} Level Reached"
         description = (
-            f"{sensor_name} is {deviation_pct:.1f}% above expected value. "
-            f"Actual: {actual}{unit}, Expected: {expected}{unit}."
+            f"{sensor_name} has reached {status} level. "
+            f"Current: {actual:.1f}{unit} (expected ≈ {expected:.1f}{unit}). "
+            f"Deviation: {deviation_pct:.1f}%.{trend_text}"
         )
 
         alert_dict = {
@@ -537,6 +561,71 @@ class SimulatorEngine:
             sensor_ids=[sensor_id],
             failure_mode_id=None,
             recommended_actions=[],
+            acknowledged=False,
+            acknowledged_at=None,
+            sim_time=self.sim_time,
+        )
+        await self._fire_callbacks(
+            self._persist_callbacks,
+            {"type": "persist_alert", "alert": alert_schema},
+        )
+
+    async def _emit_fmea_alert(self, mode: dict, timestamp: str) -> None:
+        """Build and broadcast an alert message for an FMEA failure mode match.
+
+        Emitted when a failure mode confidence escalates to "Possible" or "Probable".
+        Includes all recommended_actions and the failure_mode_id so the frontend
+        can link the alert directly to the FMEA panel.
+
+        Args:
+            mode: FMEA mode dict from FMEAEngine.evaluate() with keys:
+                  id, name, match_score, confidence_label, recommended_actions.
+            timestamp: ISO 8601 UTC timestamp string.
+        """
+        self._alert_seq += 1
+        confidence = mode["confidence_label"]
+        severity = "CRITICAL" if confidence == "Probable" else "WARNING"
+        fm_id = mode["id"]
+        name = mode["name"]
+        score_pct = round(mode["match_score"] * 100)
+        actions: list[str] = mode.get("recommended_actions", [])
+
+        title = f"{name} — {confidence} ({score_pct}% match)"
+        description = (
+            f"FMEA analysis has identified a {confidence.lower()} {name} pattern "
+            f"with {score_pct}% confidence. "
+            + (f"Immediate action: {actions[0]}." if actions else "")
+        )
+
+        alert_dict = {
+            "type": "alert",
+            "alert": {
+                "id": self._alert_seq,
+                "timestamp": timestamp,
+                "severity": severity,
+                "title": title,
+                "description": description,
+                "source": "FMEA_ENGINE",
+                "sensor_ids": [],
+                "failure_mode_id": fm_id,
+                "recommended_actions": actions,
+                "acknowledged": False,
+                "acknowledged_at": None,
+                "sim_time": self.sim_time,
+            },
+        }
+        await self._fire_callbacks(self._alert_callbacks, alert_dict)
+
+        alert_schema = AlertSchema(
+            id=self._alert_seq,
+            timestamp=timestamp,
+            severity=severity,  # type: ignore[arg-type]
+            title=title,
+            description=description,
+            source="FMEA_ENGINE",  # type: ignore[arg-type]
+            sensor_ids=[],
+            failure_mode_id=fm_id,
+            recommended_actions=actions,
             acknowledged=False,
             acknowledged_at=None,
             sim_time=self.sim_time,
