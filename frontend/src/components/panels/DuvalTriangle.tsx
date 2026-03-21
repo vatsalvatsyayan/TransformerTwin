@@ -46,7 +46,7 @@ export const DuvalTriangle = memo(function DuvalTriangle() {
           const cy = z.vertices.reduce((s, [, y]) => s + y, 0) / z.vertices.length
           return {
             x: PAD + cx * (W - 2 * PAD),
-            y: H + PAD - cy * (H - 2 * PAD),
+            y: H - PAD - cy * (H - 2 * PAD),
           }
         })(),
       })),

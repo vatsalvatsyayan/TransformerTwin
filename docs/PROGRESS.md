@@ -1,11 +1,11 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 6 — Phase 5 complete)
+> Last updated: 2026-03-21 (Session 7 — Visual QA + UI fixes complete)
 
 ---
 
-## Current Status: 🟢 Phase 5 Complete — Polish, Error Handling, README, Demo Script Done
+## Current Status: 🟢 Phase 5 + Visual QA Complete — All UI bugs fixed, demo-ready
 
 All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing.
 
@@ -271,4 +271,5 @@ Target: Charts + Duval Triangle + Alerts + Simulation + Playback
 | 2026-03-21 | 3 | Phase 1.3 + 1.4 + 1.6 fully implemented. All physics models (thermal IEC 60076-7, DGA Arrhenius, equipment hysteresis) running. Engine tick loop wired. Scenario modifiers (hot_spot, arcing, cooling_failure) complete. WebSocket streaming live. REST routes for sensors/current, scenario/status/trigger, and simulation/speed wired to engine. Fixed winding_delta runaway bug (ADR-006). | Phase 2: anomaly detection, DGA analysis, FMEA, health score |
 | 2026-03-21 | 4 | Phase 2 fully implemented (2.1–2.7). Anomaly detector (rolling Z-score + rate-of-change), DGA analyzer (Duval Triangle + TDCG + CO2/CO + trends), FMEA engine (8 failure modes), health score (weighted penalty), what-if simulation (IEC 60076-7 Arrhenius), analytics wired into engine tick loop + WebSocket + SQLite persistence. 28/28 integration tests pass. | Phase 3/4 frontend integration with live backend data |
 | 2026-03-21 | 5 | Phase 4.2a-c + 4.6 complete. Duval Triangle: correct IEC 60599 coordinate system, all 7 zone polygons with colors, live point + 20-reading fading trail, gas % display. Historical playback: LIVE/PLAYBACK toggle in BottomTimeline, scrubber slider, debounced snapshot API call, WebSocket suppression in playback mode. Fixed critical port bug (api.ts + useWebSocket.ts pointed to 8000, corrected to 8001). Backend: GET /api/sensors/snapshot endpoint added. Frontend build passes tsc + vite. | Phase 4.7 end-to-end integration test, then Phase 5 polish |
-| 2026-03-21 | 6 | Phase 5 complete. Fixed SensorRow status (was hardcoded NORMAL). Added disconnection banner and connecting overlay in App.tsx. Fixed silent API error swallowing. Wrote README.md (full setup, API reference, architecture notes). Wrote docs/DEMO_SCRIPT.md (10-min walkthrough, 8 segments, talking points, troubleshooting). 28/28 tests pass, frontend build clean. | Project complete — all phases done |
+| 2026-03-21 | 6 | Phase 5 complete. Fixed SensorRow status (was hardcoded NORMAL). Added disconnection banner and connecting overlay in App.tsx. Fixed silent API error swallowing. Wrote README.md (full setup, API reference, architecture notes). Wrote docs/DEMO_SCRIPT.md (10-min walkthrough, 8 segments, talking points, troubleshooting). 28/28 tests pass, frontend build clean. | Visual QA |
+| 2026-03-21 | 7 | Visual QA via Playwright MCP. Ran full 15-section TEST_PLAN.md. Found and fixed: DGA+FMEA never fetched (added REST polling in App.tsx + useApi.ts), FAN_BANK showing "0.0" instead of ON/OFF (SensorRow.tsx), Duval zone labels outside triangle (centroid Y sign bug in DuvalTriangle.tsx), speed button active state not visible (added ring highlight), What-If missing cooling energy row (added card to WhatIfPanel.tsx), FMEA/Alert empty states had no icons (added SVG icons). All fixes verified with screenshots. | Project complete — all phases done + QA pass |

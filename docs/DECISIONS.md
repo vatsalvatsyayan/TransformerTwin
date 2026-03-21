@@ -103,4 +103,18 @@
 - **Rationale**: Simple client-side gate. The WebSocket stays connected so reconnection logic is unaffected. Returning to live mode is instant (no reconnect needed).
 - **Trade-off**: Scenario updates (progress bar, stage) continue in playback mode — acceptable since they don't affect sensor data display.
 
+## ADR-015: DGA and FMEA data polled via REST (not WebSocket broadcast)
+- **Date**: 2026-03-21
+- **Context**: DGA analysis and FMEA results are computed on each backend tick but were never surfacing in the frontend. The WebSocket protocol only broadcasts `sensor_update`, `health_update`, `alert`, and `scenario_update`.
+- **Decision**: Poll `GET /api/dga/analysis` and `GET /api/fmea` every 5 seconds from `App.tsx`. Initial fetch on mount, then interval-based.
+- **Rationale**: Adding DGA/FMEA to the WebSocket stream would require new message types and schema changes in the Integration Contract. REST polling at 5s is sufficient since DGA gas concentrations change slowly; the endpoint is already implemented and working.
+- **Trade-off**: Slight latency (up to 5s behind vs real-time). Acceptable — DGA analysis is inherently a slow-moving signal (gases accumulate over hours/days).
+
+## ADR-016: Equipment sensor ON/OFF display via status field (not value)
+- **Date**: 2026-03-21
+- **Context**: `FAN_BANK_1`, `FAN_BANK_2`, `OIL_PUMP_1` have boolean values (0.0/1.0) which displayed as "0.0" in the sensor row numeric column.
+- **Decision**: `SensorRow.tsx` checks `status === 'ON' | 'OFF'` (from the engine's `SensorReading.status`) and renders colored text labels instead of calling `formatSensorValue`.
+- **Rationale**: The engine already computes boolean status for these sensors via `_compute_sensor_status()`. Reading from `status` avoids a magic threshold check on the frontend, keeping domain logic in the backend.
+- **Trade-off**: Tight coupling between frontend display logic and the backend's status string values ("ON"/"OFF"). Documented in Integration Contract as valid `SensorStatus` values.
+
 *Add new ADRs below as decisions are made during implementation.*

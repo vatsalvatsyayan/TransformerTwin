@@ -79,6 +79,15 @@ export const WhatIfPanel = memo(function WhatIfPanel() {
             </div>
           </div>
           <div className="text-slate-400 text-[10px]">{result.aging_interpretation}</div>
+          <div className="card p-2 flex items-center justify-between">
+            <span className="text-slate-500">Cooling Energy Impact</span>
+            <div className="text-right">
+              <span className={`font-mono text-sm font-medium ${result.cooling_energy_impact_percent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {result.cooling_energy_impact_percent >= 0 ? '+' : ''}{result.cooling_energy_impact_percent.toFixed(1)}%
+              </span>
+              <div className="text-[10px] text-slate-500">{result.cooling_energy_interpretation}</div>
+            </div>
+          </div>
           <ProjectionChart data={result.projection_timeline} />
         </div>
       )}

@@ -46,3 +46,17 @@ export async function fetchAlerts(): Promise<void> {
   const store = useStore.getState()
   store.setAlerts(data.alerts, data.total_count, data.active_count)
 }
+
+/** Fetches DGA analysis (Duval zone, TDCG, CO2/CO, gas rates) and stores it */
+export async function fetchDGAAnalysis(): Promise<void> {
+  const data = await api.getDGAAnalysis()
+  const store = useStore.getState()
+  store.setDGAAnalysis(data)
+}
+
+/** Fetches FMEA failure mode results and stores them */
+export async function fetchFMEA(): Promise<void> {
+  const data = await api.getFMEA()
+  const store = useStore.getState()
+  store.setFMEAResponse(data)
+}

@@ -7,7 +7,7 @@ import { MainLayout } from './components/layout/MainLayout'
 import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore } from './store'
-import { fetchCurrentSensors, fetchAlerts, fetchHealth } from './hooks/useApi'
+import { fetchCurrentSensors, fetchAlerts, fetchHealth, fetchDGAAnalysis, fetchFMEA } from './hooks/useApi'
 
 export default function App() {
   // Establish WebSocket connection (reconnects automatically)
@@ -21,6 +21,17 @@ export default function App() {
     fetchCurrentSensors().catch((err: unknown) => console.warn('[Init] sensors fetch failed:', err))
     fetchHealth().catch((err: unknown) => console.warn('[Init] health fetch failed:', err))
     fetchAlerts().catch((err: unknown) => console.warn('[Init] alerts fetch failed:', err))
+    fetchDGAAnalysis().catch((err: unknown) => console.warn('[Init] DGA fetch failed:', err))
+    fetchFMEA().catch((err: unknown) => console.warn('[Init] FMEA fetch failed:', err))
+  }, [])
+
+  // Poll DGA analysis and FMEA every 5s (not in WebSocket, so REST polling is needed)
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchDGAAnalysis().catch(() => undefined)
+      fetchFMEA().catch(() => undefined)
+    }, 5000)
+    return () => clearInterval(id)
   }, [])
 
   const isConnecting = connectionStatus === 'connecting' && !hasData

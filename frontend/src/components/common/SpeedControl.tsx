@@ -28,8 +28,8 @@ export const SpeedControl = memo(function SpeedControl() {
           onClick={() => void handleSpeedChange(speed)}
           className={`px-2 py-0.5 rounded font-mono transition-colors ${
             speedMultiplier === speed
-              ? 'bg-blue-600 text-white'
-              : 'bg-[#252840] text-slate-400 hover:bg-[#2d3148]'
+              ? 'bg-blue-600 text-white ring-2 ring-blue-400 ring-offset-1 ring-offset-[#111320]'
+              : 'bg-[#252840] text-slate-400 hover:bg-[#2d3148] hover:text-slate-300'
           }`}
         >
           {speed}×

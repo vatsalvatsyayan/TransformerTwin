@@ -73,6 +73,12 @@ coverage/
 # ── Claude Code internals ─────────────────────────────────────────────────────
 .claude/
 
+# ── Screenshots (Playwright QA captures) ─────────────────────────────────────
+screenshots/*.png
+screenshots/*.jpg
+screenshots/*.jpeg
+screenshots/*.webp
+
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 logs/

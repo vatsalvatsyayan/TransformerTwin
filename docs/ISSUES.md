@@ -53,6 +53,39 @@
 
 ## Resolved
 
+### ✅ ISSUE-011: DGA analysis and FMEA data never fetched on frontend
+- **Found**: Session 7 visual QA (2026-03-21)
+- **Severity**: High — DGASummary always showed "No DGA data yet.", FMEAPanel always showed empty state even during active fault scenarios
+- **Description**: `store.setDGAAnalysis()` and `store.setFMEAResponse()` were never called. `fetchDGAAnalysis()` and `fetchFMEA()` didn't exist in `useApi.ts`. `App.tsx` had no DGA/FMEA polling.
+- **Resolution**: Added `fetchDGAAnalysis()` and `fetchFMEA()` to `useApi.ts`. Added initial fetch + 5s polling interval for both in `App.tsx`.
+
+### ✅ ISSUE-012: FAN_BANK_1/2 and OIL_PUMP_1 showed "0.0" instead of ON/OFF
+- **Found**: Session 7 visual QA (2026-03-21)
+- **Severity**: Medium — Equipment sensors displayed raw float value instead of meaningful state label
+- **Description**: `SensorRow.tsx` always called `formatSensorValue(latestValue, unit)` for all sensors. Equipment sensors have boolean values (0.0/1.0) and unit "" which formatted as "0.0".
+- **Resolution**: Added conditional in SensorRow: if `status === 'ON'` render green "ON", if `status === 'OFF'` render slate "OFF", else fall through to numeric format.
+
+### ✅ ISSUE-013: Duval Triangle zone labels positioned outside/below triangle
+- **Found**: Session 7 visual QA (2026-03-21)
+- **Severity**: Medium — Zone labels (PD, T1, T2, T3, D1, D2, DT) rendered below the SVG triangle boundary
+- **Description**: Centroid Y calculation in `DuvalTriangle.tsx` used `H + PAD - cy * (H - 2 * PAD)` but should be `H - PAD - cy * (H - 2 * PAD)` (matching `normalizedToSVG` formula). The `+PAD` caused an 80px (2 × TRIANGLE_PADDING) downward offset.
+- **Resolution**: Changed `H + PAD` to `H - PAD` in the zone centroid computation.
+
+### ✅ ISSUE-014: Speed button active state not clearly visible
+- **Found**: Session 7 visual QA (2026-03-21)
+- **Severity**: Low — Active speed button (30×) had `bg-blue-600` but no ring/border for clear visual differentiation
+- **Resolution**: Added `ring-2 ring-blue-400 ring-offset-1 ring-offset-[#111320]` to the active button class in `SpeedControl.tsx`.
+
+### ✅ ISSUE-015: What-If results missing Cooling Energy Impact row
+- **Found**: Session 7 visual QA (2026-03-21)
+- **Severity**: Low — `SimulationResponse` has `cooling_energy_impact_percent` and `cooling_energy_interpretation` fields but WhatIfPanel never rendered them
+- **Resolution**: Added cooling energy card to the results section in `WhatIfPanel.tsx`.
+
+### ✅ ISSUE-016: FMEA and Alert panels had no empty-state icon
+- **Found**: Session 7 visual QA (2026-03-21)
+- **Severity**: Low — Both panels showed plain text only when empty; inconsistent with polished UI
+- **Resolution**: Added SVG icons (checkmark circle for FMEA, shield-check for Alerts) with descriptive subtitle text to both empty state renderings.
+
 ### ✅ ISSUE-009: SensorRow hardcoded status NORMAL (never showed CAUTION/WARNING/CRITICAL)
 - **Found**: Phase 5 review (2026-03-21)
 - **Severity**: Medium — status dots always showed green regardless of actual sensor state
