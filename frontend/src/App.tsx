@@ -7,7 +7,7 @@ import { MainLayout } from './components/layout/MainLayout'
 import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore } from './store'
-import { fetchCurrentSensors, fetchAlerts, fetchHealth, fetchDGAAnalysis, fetchFMEA } from './hooks/useApi'
+import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA } from './hooks/useApi'
 
 export default function App() {
   // Establish WebSocket connection (reconnects automatically)
@@ -20,7 +20,8 @@ export default function App() {
   useEffect(() => {
     fetchCurrentSensors().catch((err: unknown) => console.warn('[Init] sensors fetch failed:', err))
     fetchHealth().catch((err: unknown) => console.warn('[Init] health fetch failed:', err))
-    fetchAlerts().catch((err: unknown) => console.warn('[Init] alerts fetch failed:', err))
+    // Alerts are NOT pre-loaded from DB — each page refresh starts with a clean alert state.
+    // New alerts arrive via WebSocket and accumulate during the session.
     fetchDGAAnalysis().catch((err: unknown) => console.warn('[Init] DGA fetch failed:', err))
     fetchFMEA().catch((err: unknown) => console.warn('[Init] FMEA fetch failed:', err))
   }, [])

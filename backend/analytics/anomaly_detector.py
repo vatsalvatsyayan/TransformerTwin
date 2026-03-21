@@ -200,7 +200,10 @@ class AnomalyDetector:
         values = list(hist)
         mean = sum(values) / len(values)
         variance = sum((v - mean) ** 2 for v in values) / len(values)
-        std = math.sqrt(variance) if variance > 0 else 1e-9
+        # Floor std at 1% of sensor range to prevent tiny natural noise
+        # from generating huge z-scores and false CAUTION alerts.
+        min_std = _sensor_range(sensor_id) * 0.01
+        std = max(min_std, math.sqrt(variance) if variance > 0 else 0.0)
 
         z = abs(value - mean) / std
 

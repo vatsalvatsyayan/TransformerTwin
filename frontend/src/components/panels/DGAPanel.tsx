@@ -9,7 +9,7 @@ const SUB_TABS = ['Trends', 'Duval', 'Summary'] as const
 type SubTab = (typeof SUB_TABS)[number]
 
 export const DGAPanel = memo(function DGAPanel() {
-  const [sub, setSub] = useState<SubTab>('Trends')
+  const [sub, setSub] = useState<SubTab>('Duval')
 
   return (
     <div className="flex flex-col h-full">

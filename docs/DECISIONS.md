@@ -131,4 +131,18 @@
 - **Rationale**: jsdom adds significant overhead and isn't needed for pure function and store action tests. Zustand stores work in a Node environment because they're just closures around JavaScript state.
 - **Trade-off**: Component rendering tests (React Testing Library) would require switching to `'jsdom'` environment. If component tests are added later, the environment config will need to change.
 
+## ADR-019: HealthGauge + HealthBreakdown always visible in TabContainer strip
+- **Date**: 2026-03-21
+- **Context**: HealthGauge and HealthBreakdown were implemented but never placed in the UI. They need to be visible at all times (demo script calls out watching health score drop during fault scenarios), not behind a tab.
+- **Decision**: Added a fixed health strip (64px circular SVG gauge + 6 horizontal component bars) between the tab bar and tab content in `TabContainer.tsx`. This makes health always visible regardless of which tab is active.
+- **Rationale**: Avoids requiring a separate "Health" tab or hiding it in the sensor list. The strip is compact (~90px), non-scrollable, and positioned where the user naturally looks when switching tabs.
+- **Trade-off**: Reduces available height for tab content by ~90px. Acceptable — all tab panels scroll internally.
+
+## ADR-020: Anomaly detector std floor at 1% of sensor range
+- **Date**: 2026-03-21
+- **Context**: The anomaly detector was using `1e-9` as a std floor, causing near-zero variance in stable sensors to produce enormous z-scores and constant false CAUTION alerts. Over 1400 alerts accumulated during a test session.
+- **Decision**: Set `min_std = _sensor_range(sensor_id) * 0.01` (1% of sensor range). Uses `_sensor_range()` which already computes `abs(warning - caution)` per sensor.
+- **Rationale**: 1% of the caution→warning band is a physically reasonable noise floor. For TOP_OIL_TEMP (range=15°C), this is 0.15°C — realistic sensor noise is well below this. An actual anomaly should deviate by multiple sensor ranges, not fractions of a degree. This matches the spec in MEMORY.md.
+- **Trade-off**: Marginally increases the minimum detectable anomaly size, which is correct behavior. Alert flooding was far more harmful to the demo than a slightly higher detection threshold.
+
 *Add new ADRs below as decisions are made during implementation.*

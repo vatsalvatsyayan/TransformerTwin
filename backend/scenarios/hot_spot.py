@@ -69,18 +69,27 @@ class HotSpotScenario(BaseScenario):
             return "Stage 3: Critical hot spot — immediate action required"
 
     def get_thermal_modifiers(self) -> dict[str, float]:
-        """Return winding temperature additive offset for current stage.
+        """Return winding and oil temperature additive offsets for current stage.
+
+        In a real developing hot spot, excess winding heat transfers to the oil,
+        raising top-oil temperature and eventually activating fan banks.
+        top_oil_delta is a simplified surrogate for this heat transfer — it does
+        NOT feed back into the thermal lag (same treatment as winding_delta).
 
         Returns:
-            Dict with key "winding_delta": additive degrees C to winding temp.
+            Dict with keys "winding_delta" and "top_oil_delta": additive °C.
         """
         t = self.elapsed_sim_time
         if t < _STAGE_1_END_S:
-            return {"winding_delta": _WINDING_DELTA_STAGE_1}
+            # Stage 1: winding local overheating only; oil not yet affected
+            return {"winding_delta": _WINDING_DELTA_STAGE_1, "top_oil_delta": 0.0}
         elif t < _STAGE_2_END_S:
-            return {"winding_delta": _WINDING_DELTA_STAGE_2}
+            # Stage 2: heat spreading to oil — top oil rises ~15 °C above normal
+            # (normal peak ~65 °C → ~80 °C → Fan Bank 1 activates at 75 °C)
+            return {"winding_delta": _WINDING_DELTA_STAGE_2, "top_oil_delta": 15.0}
         else:
-            return {"winding_delta": _WINDING_DELTA_STAGE_3}
+            # Stage 3: severe — top oil rises ~25 °C, Fan Bank 2 may also activate
+            return {"winding_delta": _WINDING_DELTA_STAGE_3, "top_oil_delta": 25.0}
 
     def get_dga_modifiers(self) -> dict[str, float]:
         """Return per-gas ppm/second injection rates for current stage.

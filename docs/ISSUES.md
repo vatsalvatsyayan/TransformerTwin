@@ -53,6 +53,24 @@
 
 ## Resolved
 
+### ✅ ISSUE-017: HealthGauge and HealthBreakdown components never rendered
+- **Found**: Session 8 Playwright QA (2026-03-21)
+- **Severity**: High — health gauge and component breakdown were completely invisible in the UI despite being correctly implemented
+- **Description**: `HealthGauge.tsx` and `HealthBreakdown.tsx` existed in `frontend/src/components/health/` but were never imported or used anywhere. The right-panel tab container only showed Sensors, DGA, FMEA, What-If, and Alerts — no health visualization.
+- **Resolution**: Imported both components in `TabContainer.tsx` and rendered them in a compact strip (64px circular gauge + 6 horizontal component bars) between the tab bar and tab content, always visible regardless of active tab.
+
+### ✅ ISSUE-018: Anomaly detector min_std floor too small — caused alert flooding
+- **Found**: Session 8 Playwright QA (2026-03-21)
+- **Severity**: High — 1400+ CAUTION alerts accumulated during testing; alert panel was unusable
+- **Description**: `anomaly_detector.py` used `std = math.sqrt(variance) if variance > 0 else 1e-9`. The `1e-9` floor is far too small — near-zero variance from stable sensor readings produced enormous z-scores (e.g., z > 3.0 from ±0.01°C noise), triggering constant CAUTION anomaly events on nearly every tick.
+- **Resolution**: Changed to `min_std = _sensor_range(sensor_id) * 0.01; std = max(min_std, math.sqrt(variance) if variance > 0 else 0.0)`. For a thermal sensor with range=15, min_std=0.15°C, preventing sub-0.15°C noise from triggering anomaly alerts.
+
+### ✅ ISSUE-019: Historical playback snapshot route not registered in running backend
+- **Found**: Session 8 Playwright QA (2026-03-21)
+- **Severity**: High — clicking LIVE badge always returned 404, scrubber never appeared
+- **Description**: `GET /api/sensors/snapshot` was added to `routes_sensor.py` after the backend was started without `--reload`. FastAPI didn't pick up the new route from the unchanged module. All snapshot API calls returned 404 "Not Found".
+- **Resolution**: Restarted the backend. Route now registers correctly. For development, always run backend with `--reload` to pick up code changes automatically.
+
 ### ✅ ISSUE-011: DGA analysis and FMEA data never fetched on frontend
 - **Found**: Session 7 visual QA (2026-03-21)
 - **Severity**: High — DGASummary always showed "No DGA data yet.", FMEAPanel always showed empty state even during active fault scenarios

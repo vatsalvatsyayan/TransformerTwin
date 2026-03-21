@@ -7,6 +7,8 @@ import { FMEAPanel } from './FMEAPanel'
 import { WhatIfPanel } from './WhatIfPanel'
 import { AlertPanel } from './AlertPanel'
 import { useActiveAlertCount } from '../../store/selectors'
+import { HealthGauge } from '../health/HealthGauge'
+import { HealthBreakdown } from '../health/HealthBreakdown'
 
 const TABS = ['Sensors', 'DGA', 'FMEA', 'What-If', 'Alerts'] as const
 type Tab = (typeof TABS)[number]
@@ -37,6 +39,15 @@ export const TabContainer = memo(function TabContainer() {
             )}
           </button>
         ))}
+      </div>
+
+      {/* Health gauge + component breakdown — always visible above tab content */}
+      <div className="flex items-center gap-3 px-3 py-2 border-b border-[#2d3148] bg-[#161927] flex-shrink-0">
+        <HealthGauge size={64} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">Health Components</p>
+          <HealthBreakdown />
+        </div>
       </div>
 
       {/* Tab content */}

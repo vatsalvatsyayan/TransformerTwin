@@ -1,11 +1,11 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 8 — Frontend unit tests complete)
+> Last updated: 2026-03-21 (Session 9 — Comprehensive Playwright QA + 3 critical bug fixes)
 
 ---
 
-## Current Status: 🟢 Phase 6 Complete — 125/125 frontend tests pass, fully demo-ready
+## Current Status: 🟢 Session 9 Complete — All features verified, 3 bugs fixed, fully demo-ready
 
 All backend intelligence implemented. Anomaly detection, DGA analysis, FMEA, health score, what-if simulation, and WebSocket wiring all running. 28/28 integration tests passing.
 
@@ -304,3 +304,4 @@ Target: Vitest + React Testing Library — per CLAUDE.md spec (was the only unim
 | 2026-03-21 | 6 | Phase 5 complete. Fixed SensorRow status (was hardcoded NORMAL). Added disconnection banner and connecting overlay in App.tsx. Fixed silent API error swallowing. Wrote README.md (full setup, API reference, architecture notes). Wrote docs/DEMO_SCRIPT.md (10-min walkthrough, 8 segments, talking points, troubleshooting). 28/28 tests pass, frontend build clean. | Visual QA |
 | 2026-03-21 | 7 | Visual QA via Playwright MCP. Ran full 15-section TEST_PLAN.md. Found and fixed: DGA+FMEA never fetched (added REST polling in App.tsx + useApi.ts), FAN_BANK showing "0.0" instead of ON/OFF (SensorRow.tsx), Duval zone labels outside triangle (centroid Y sign bug in DuvalTriangle.tsx), speed button active state not visible (added ring highlight), What-If missing cooling energy row (added card to WhatIfPanel.tsx), FMEA/Alert empty states had no icons (added SVG icons). All fixes verified with screenshots. | Frontend unit tests |
 | 2026-03-21 | 8 | Phase 6: Frontend unit tests. Installed Vitest, configured vite.config.ts. Wrote 3 test files (125 tests total): duval-geometry.test.ts (53 — coord transforms, zone classification per IEC 60599), formatters.test.ts (35 — all format functions), store.test.ts (37 — actions, ring buffer, health labels, alert dedup, DGA trail cap). All 125/125 pass. Frontend build still clean. | Project fully complete |
+| 2026-03-21 | 9 | Comprehensive Playwright MCP QA of all 12 feature areas. Found and fixed 3 critical bugs: (1) HealthGauge + HealthBreakdown never rendered — added to TabContainer as always-visible strip; (2) anomaly detector min_std floor too small (1e-9) causing 1400+ alert flood — fixed to 1% of sensor range; (3) historical playback snapshot route not registered because backend was started without --reload before route was added — restarted backend. All features now verified: WebSocket, header controls, 3D model, 21 sensors + sparklines, health gauge/breakdown, DGA/Duval Triangle, FMEA, What-If, alerts, hot-spot scenario, arcing scenario, playback scrubber. ADR-019, ADR-020 logged. ISSUE-017, ISSUE-018, ISSUE-019 resolved. | Project fully demo-ready |

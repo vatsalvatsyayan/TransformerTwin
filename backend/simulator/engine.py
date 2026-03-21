@@ -268,6 +268,7 @@ class SimulatorEngine:
         thermal_mods = scenario.get_thermal_modifiers()
         dga_mods = scenario.get_dga_modifiers()
         winding_delta: float = thermal_mods.get("winding_delta", 0.0)
+        top_oil_delta: float = thermal_mods.get("top_oil_delta", 0.0)
         cooling_override: str | None = thermal_mods.get("cooling_mode_override", None)
 
         # --- 3. Load + ambient profiles ---
@@ -305,7 +306,9 @@ class SimulatorEngine:
 
         # --- 7. Apply noise and update state ---
         self.state.sim_time = round(self.sim_time, 1)
-        self.state.top_oil_temp = add_noise("TOP_OIL_TEMP", thermal.top_oil_temp)
+        # top_oil_delta: scenario additive offset (e.g. hot_spot heat transfer to oil).
+        # Applied to output only — does NOT feed back into the thermal lag integrator.
+        self.state.top_oil_temp = add_noise("TOP_OIL_TEMP", thermal.top_oil_temp + top_oil_delta)
         self.state.bot_oil_temp = add_noise("BOT_OIL_TEMP", thermal.bot_oil_temp)
         self.state.winding_temp = add_noise("WINDING_TEMP", thermal.winding_temp)
         self.state.load_current = add_noise("LOAD_CURRENT", round(load_fraction * 100.0, 1))
