@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply h-full bg-[#0f1117] text-slate-100;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-[#1a1d27];
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500;
+  }
+}
+
+@layer utilities {
+  .panel {
+    @apply bg-[#1e2133] border border-[#2d3148] rounded-lg;
+  }
+
+  .card {
+    @apply bg-[#252840] border border-[#3d4168] rounded-md;
+  }
+
+  .text-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  }
+}
