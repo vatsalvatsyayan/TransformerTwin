@@ -1,4 +1,5 @@
 // Tab switcher for right panel — 8 tabs including Timeline and Physics
+// Physics tab now has two sub-views: Correlation Chart + Operating Envelope
 
 import { memo, useState } from 'react'
 import { SensorPanel } from './SensorPanel'
@@ -9,6 +10,7 @@ import { AlertPanel } from './AlertPanel'
 import { DecisionPanel } from './DecisionPanel'
 import { EventTimeline } from './EventTimeline'
 import { CorrelationChart } from '../charts/CorrelationChart'
+import { OperatingEnvelopeChart } from '../charts/OperatingEnvelopeChart'
 import { useActiveAlertCount } from '../../store/selectors'
 import { useStore } from '../../store'
 import { HealthGauge } from '../health/HealthGauge'
@@ -17,6 +19,46 @@ import { ScenarioProgressBar } from '../common/ScenarioProgressBar'
 
 const TABS = ['Sensors', 'DGA', 'FMEA', 'Decision', 'What-If', 'Alerts', 'Timeline', 'Physics'] as const
 type Tab = (typeof TABS)[number]
+
+type PhysicsSubTab = 'Correlation' | 'Envelope'
+
+// ─── Physics tab — sub-tab switcher ──────────────────────────────────────────
+
+function PhysicsTabContent() {
+  const [subTab, setSubTab] = useState<PhysicsSubTab>('Envelope')
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Sub-tab bar */}
+      <div className="flex border-b border-[#2d3148] bg-[#1a1d27] flex-shrink-0">
+        {(['Envelope', 'Correlation'] as PhysicsSubTab[]).map((st) => (
+          <button
+            key={st}
+            onClick={() => setSubTab(st)}
+            className={`px-4 py-2 text-[10px] font-medium transition-colors flex-shrink-0 ${
+              subTab === st
+                ? 'text-blue-400 border-b-2 border-blue-500'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {st === 'Envelope' ? '◇ Operating Envelope' : '∿ Temporal Correlation'}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <div className="flex items-center pr-3 text-[9px] text-slate-700">
+          IEC 60076-7 thermal model
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        {subTab === 'Envelope'     && <OperatingEnvelopeChart />}
+        {subTab === 'Correlation'  && <CorrelationChart />}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main TabContainer ────────────────────────────────────────────────────────
 
 export const TabContainer = memo(function TabContainer() {
   const [activeTab, setActiveTab] = useState<Tab>('Sensors')
@@ -79,7 +121,7 @@ export const TabContainer = memo(function TabContainer() {
         {activeTab === 'What-If'   && <WhatIfPanel />}
         {activeTab === 'Alerts'    && <AlertPanel />}
         {activeTab === 'Timeline'  && <EventTimeline />}
-        {activeTab === 'Physics'   && <CorrelationChart />}
+        {activeTab === 'Physics'   && <PhysicsTabContent />}
       </div>
     </div>
   )

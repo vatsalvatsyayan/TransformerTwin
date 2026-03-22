@@ -75,7 +75,12 @@ HealthStatusLabel = Literal["GOOD", "FAIR", "POOR", "CRITICAL"]
 # ---------------------------------------------------------------------------
 
 class TransformerState(BaseModel):
-    """Mutable simulation state carried between ticks."""
+    """Mutable simulation state carried between ticks.
+
+    Physics-based "expected" fields (expected_*) hold the IEC 60076-7 model
+    prediction for current load/ambient/cooling without any fault modifier.
+    The gap between actual and expected is the core digital-twin anomaly signal.
+    """
 
     sim_time: float = 0.0
     top_oil_temp: float = 55.0
@@ -83,13 +88,14 @@ class TransformerState(BaseModel):
     winding_temp: float = 75.0
     load_current: float = 60.0
     ambient_temp: float = 25.0
-    dga_h2: float = 10.0
-    dga_ch4: float = 5.0
-    dga_c2h6: float = 3.0
-    dga_c2h4: float = 2.0
-    dga_c2h2: float = 0.1
-    dga_co: float = 80.0
-    dga_co2: float = 600.0
+    # DGA defaults match DGA_INITIAL_PPM in config.py (aged-transformer baseline)
+    dga_h2: float = 25.0
+    dga_ch4: float = 12.0
+    dga_c2h6: float = 15.0
+    dga_c2h4: float = 4.0
+    dga_c2h2: float = 0.5
+    dga_co: float = 120.0
+    dga_co2: float = 900.0
     fan_bank_1: bool = True
     fan_bank_2: bool = False
     oil_pump_1: bool = True
@@ -100,6 +106,14 @@ class TransformerState(BaseModel):
     bushing_cap_hv: float = 500.0
     bushing_cap_lv: float = 420.0
     cooling_mode: str = "ONAF"
+
+    # --- Physics-based model predictions (IEC 60076-7 without fault modifiers) ---
+    # These represent what the thermal model says temperatures SHOULD be at the
+    # current load, ambient, and cooling mode — the digital-twin "expected value".
+    # The deviation (actual - expected) is the fault signature.
+    expected_top_oil_temp: float = 0.0
+    expected_winding_temp: float = 0.0
+    expected_bot_oil_temp: float = 0.0
 
 
 # ---------------------------------------------------------------------------

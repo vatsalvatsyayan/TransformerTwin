@@ -116,6 +116,21 @@
 - **Description**: `App.tsx` called initial REST fetches with `void` prefix so thrown errors were uncaught.
 - **Resolution**: Phase 5.2 — changed to `.catch()` handlers that log warnings to console.
 
+### ✅ ISSUE-020: DGA "expected" value used statistical mean instead of physics model (Session 16)
+- **Found**: Session 16 critical review (2026-03-21)
+- **Severity**: High — Core digital twin signal was incorrect. The `expected` field on thermal SensorReadings came from a rolling mean of historical values, not the IEC 60076-7 physics model. This meant deviation detection was lag-based (compares to past actuals), not physics-based (compares to model prediction).
+- **Resolution**: `winding_temp_physics` added to `ThermalState`. `expected_*` fields added to `TransformerState`. Engine captures IEC model predictions BEFORE scenario modifiers. SensorRow now shows true model-vs-reality deviation.
+
+### ✅ ISSUE-021: DGA initial gas levels too clean for a 17-year-old transformer (Session 16)
+- **Found**: Session 16 critical review (2026-03-21)
+- **Severity**: Medium — Starting H2=15, CO=80, CO2=600 produced CO2/CO ratio of 7.5 but looked artificially low on day 1. No alarm context for the operator — the transformer appeared brand new.
+- **Resolution**: Updated `DGA_INITIAL_PPM` in config.py to H2=25, CH4=12, C2H6=15, C2H4=4, C2H2=0.5, CO=120, CO2=900 (CO2/CO=7.5, TDCG=176.5 ppm — normal for 17-year-old unit per IEEE C57.104).
+
+### ✅ ISSUE-022: Scenario transitions produced no immediate operator alarm (Session 16)
+- **Found**: Session 16 critical review (2026-03-21)
+- **Severity**: High — Real SCADA systems fire equipment protection alarms immediately on fault events (Buchholz relay, overcurrent trip). Previous implementation only alerted after thermal thresholds were crossed, which could be 10–30 sim-minutes into a scenario.
+- **Resolution**: Added `_emit_scenario_start_alert()` to engine.py — fires SCADA-authentic alarm on scenario activation for all 5 fault types.
+
 ### ✅ ISSUE-001: REST routes still returning stub data
 - **Resolved**: Phase 2.6 (2026-03-21)
 - **Resolution**: `/api/health`, `/api/dga/analysis`, `/api/fmea` now read from `engine.latest_*` attributes set by the analytics tick loop.

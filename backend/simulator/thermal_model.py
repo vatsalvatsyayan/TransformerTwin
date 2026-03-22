@@ -28,12 +28,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ThermalState:
-    """Output of ThermalModel.tick() — all three temperatures and cooling mode."""
+    """Output of ThermalModel.tick() — all three temperatures and cooling mode.
 
-    top_oil_temp: float    # °C
-    bot_oil_temp: float    # °C
-    winding_temp: float    # °C
-    cooling_mode: str      # "ONAN" | "ONAF" | "OFAF"
+    `winding_temp_physics` is the IEC 60076-7 model prediction without any
+    scenario modifier — the "what should it be?" baseline.
+    `winding_temp` includes the scenario delta — the "what is it?" reading.
+    The gap (winding_temp - winding_temp_physics) is the fault signature.
+    """
+
+    top_oil_temp: float          # °C — physics prediction (= "expected" top oil)
+    bot_oil_temp: float          # °C — physics prediction (= "expected" bot oil)
+    winding_temp: float          # °C — observed (includes scenario delta + physics)
+    winding_temp_physics: float  # °C — pure IEC 60076-7 model ("expected" winding)
+    cooling_mode: str            # "ONAN" | "ONAF" | "OFAF"
 
 
 def _compute_steady_top_oil_rise(load_fraction: float, cooling_mode: str) -> float:
@@ -215,5 +222,7 @@ class ThermalModel:
             bot_oil_temp=round(bot_oil, 2),
             # Scenario delta is added to the OBSERVED output only
             winding_temp=round(new_winding_physics + winding_delta, 2),
+            # Pure IEC 60076-7 prediction — "what should a healthy transformer read?"
+            winding_temp_physics=round(new_winding_physics, 2),
             cooling_mode=cooling_mode,
         )

@@ -1,9 +1,79 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 15 — Digital Twin Core: Thermal Heatmap, KPI Bar, Event Timeline, Physics Correlation)
+> Last updated: 2026-03-21 (Session 16 — Real Digital Twin: Model vs Reality, Operating Envelope, DGA Rates)
 
 ---
+
+## Current Status: 🟢 Session 16 Complete — True Digital Twin Paradigm
+
+### Session 16 Additions (2026-03-21)
+
+This session addresses the **fundamental gap between "monitoring dashboard" and "digital twin"**: the model-vs-reality paradigm. Previous sessions had all the visual chrome, but the core DT insight — _what should it read vs what does it read_ — was missing. Now it's the centerpiece.
+
+**Critical Analysis (as digital twin domain expert):**
+The previous system's "expected" value in sensor readings used a rolling statistical mean of recent actuals — that is a statistical anomaly detector, not a digital twin. A real DT continuously runs the physics model in parallel and compares: "given load=72%, ambient=28°C, cooling=ONAF, IEC 60076-7 predicts 68°C — actual is 79°C — this +11°C gap is the fault signature." This distinction is what GE SmartSignal and similar platforms are built on.
+
+#### Feature: Physics-Based Model vs. Reality (THE Core DT Change)
+
+**Backend — `simulator/thermal_model.py`:**
+- Added `winding_temp_physics: float` field to `ThermalState` dataclass — the IEC 60076-7 prediction without scenario modifier
+- `tick()` now returns both `winding_temp` (observed, includes fault delta) and `winding_temp_physics` (pure physics prediction)
+- Comment explains the digital-twin significance: "gap = fault signature"
+
+**Backend — `models/schemas.py`:**
+- Added `expected_top_oil_temp`, `expected_winding_temp`, `expected_bot_oil_temp` to `TransformerState` (all default 0.0, backward compatible)
+- Updated DGA default values to match new config baseline
+
+**Backend — `simulator/engine.py`:**
+- `_tick()` now captures expected values from thermal model BEFORE scenario modifiers: `state.expected_*` = IEC 60076-7 prediction
+- `_emit_sensor_group()` uses physics-based expected values instead of rolling mean for the `expected` field in WebSocket messages — **this is the paradigm shift**
+- Added `_last_scenario_id` tracking to detect scenario transitions
+- New `_emit_scenario_start_alert()` method: emits an equipment/operational alert at the START of each scenario (before thermal consequences manifest), making fault causality physically realistic
+
+#### Feature: Realistic Equipment Fault Alarms at Scenario Start
+Five scenario-specific startup alerts that fire when a scenario begins:
+- `hot_spot`: "Abnormal Winding Temperature Rise Detected — IEC model deviation >10°C"
+- `cooling_failure`: "EQUIPMENT ALARM: Cooling Fan Protection Tripped — Overcurrent" (CRITICAL severity)
+- `arcing`: "PROTECTION ALERT: Buchholz Relay Pre-Trip Condition"
+- `partial_discharge`: "Online Monitor: Partial Discharge Activity Increasing"
+- `paper_degradation`: "Insulation Aging Monitor: CO/CO₂ Ratio Declining"
+
+In real SCADA, the equipment event fires FIRST, then thermal consequences follow. This is now correct.
+
+#### Feature: Model-vs-Actual Deviation in SensorRow (`SensorRow.tsx`)
+For the three thermal sensors (TOP_OIL_TEMP, WINDING_TEMP, BOT_OIL_TEMP):
+- Shows `mdl +11.2°C` badge when deviation ≥ 0.5°C
+- Color-coded: grey (< 5°C), yellow (5–10°C), orange (10–15°C), red (≥ 15°C)
+- Expandable context line shows "IEC model: 68.0°C · actual: 79.4°C" when deviation ≥ 2°C
+- This is the defining digital twin signal — visible in the sensor panel at all times
+
+#### Feature: DGA Rate-to-Threshold (`DGASummary.tsx` — fully rewritten)
+- TDCG bar: visual fill with IEEE C57.104 thresholds (720/1920/4630 ppm) marked
+- CO₂/CO Ratio: color-coded bar with normal/caution/critical ranges; interpretation text
+- Gas concentration table: for each gas, shows current ppm, trend arrow, rate (+X.X ppm/day), and **time-to-next-threshold** at current rate (e.g., "to CAUTION: 4 days")
+- Time-to-threshold colored: red = hours, orange < 7 days, yellow < 30 days, slate = safe
+- Standards badges: IEEE C57.104, IEC 60599
+
+#### Feature: Operating Envelope Chart (`OperatingEnvelopeChart.tsx` — NEW)
+The defining digital twin visualization — Load% vs Top Oil Temperature:
+- **Blue curve**: IEC 60076-7 steady-state prediction at current cooling mode (ONAN/ONAF/OFAF)
+- **Historical scatter points**: colored by deviation from model (grey=on-model, yellow=+2–5°C, orange=+5–10°C, red=>+10°C fault)
+- **Live point**: large dot showing where transformer is RIGHT NOW on the envelope
+- **Design limit lines**: CAUTION/WARNING/CRITICAL horizontal reference lines
+- **Current operating callout**: shows Load%, Actual, Model, and deviation prominently
+- **Explanation tile**: "Why This Matters" — explains the GE SmartSignal paradigm
+- Added to Physics tab as the primary sub-tab (Operating Envelope | Temporal Correlation)
+
+#### Feature: Realistic DGA Baseline (config.py + schemas.py)
+Updated initial DGA gas levels to represent TRF-001 as a genuine 17-year-old in-service transformer:
+- H₂: 15→25 ppm, CH₄: 8→12 ppm, C₂H₆: 12→15 ppm, C₂H₄: 3→4 ppm
+- C₂H₂: 0.2→0.5 ppm, CO: 80→120 ppm, CO₂: 600→900 ppm
+- CO₂/CO ratio = 7.5 → within normal aging range (5–13 per IEEE C57.104)
+- TDCG baseline = 176.5 ppm — well within Level 1 (<720 ppm)
+
+#### Session 16 Log Entry
+| 2026-03-21 | 16 | Real DT paradigm: physics model vs. reality in thermal sensors (winding_temp_physics in ThermalState, expected_* in TransformerState, engine captures IEC 60076-7 prediction), scenario-start equipment alarms (5 scenarios), SensorRow model deviation badge, DGASummary rewrite (TDCG bar + CO₂/CO ratio + rate-to-threshold), OperatingEnvelopeChart (Load% vs Temp with IEC model curve + historical scatter + deviation coloring). 28/28 backend + 125/125 frontend tests pass. |
 
 ## Current Status: 🟢 Session 15 Complete — Digital Twin Visual & UX Overhaul
 
@@ -475,3 +545,4 @@ Target: Vitest + React Testing Library — per CLAUDE.md spec (was the only unim
 | 2026-03-21 | 13 | Operator Controls + Speed 200× fix + Health→3D highlight. SpeedUpdateRequestSchema le=60→200. Health breakdown rows clickable, selected component highlights cyan in 3D model via useHealthColor. New routes_operator.py (POST /api/operator/actions, GET /api/operator/status). Engine applies load/cooling overrides before physics. DecisionPanel: Operator Controls section (Load/Cooling buttons) + active overrides green banner. 28/28 + 125/125 tests. | Session 14 |
 | 2026-03-21 | 14 | Fault Cascade + Thermal Fatigue + Prognostics Engine. Engine gains cascade tracking (_winding_critical_duration → injects C₂H₂/H₂ DGA after 5 sim-min CRITICAL), thermal stress integral (_thermal_stress_integral → fatigue_score 0–1). New analytics/prognostics.py: linear regression on health history → degradation rate, time-to-warning/critical, 24h/48h/72h projections. New GET /api/prognostics. New PrognosticsWidget in Decision tab. FMEACard: visual causal evidence chain. ScenarioProgressBar: cascade emergency banner. Frontend build clean. | Digital twin UX overhaul |
 | 2026-03-21 | 15 | Digital Twin Core Overhaul (all 5 changes frontend-only). (1) AssetKPIBar: transformer nameplate + 5 live KPI tiles with limit bars. (2) Tank.tsx thermal gradient: 5-slice BOT→TOP oil temp emissive interpolation — you can see the heat in the oil column. (3) RadiatorBank.tsx animated oil flow: useFrame particles when fans/pump ON. (4) EventTimeline tab: chronological operational log (alerts, health drops, scenario stages, cascade events). (5) SensorRow trend arrows + limit bars. (6) Physics tab with CorrelationChart: dual Y-axis Load% vs Temps proving IEC 60076-7 causality. 125/125 frontend tests, build clean. | Demo-ready |
+| 2026-03-21 | 16 | Real DT paradigm — physics model vs. reality throughout. (1) `winding_temp_physics` added to ThermalState (pure IEC 60076-7, no fault modifier). (2) `expected_top_oil_temp/winding_temp/bot_oil_temp` in TransformerState; engine captures before scenario modifier applies. (3) SensorRow rewrite: IEC model deviation badge (mdl ±X°C) + expandable context line ("IEC model: 68.0°C · actual: 79.4°C") for thermal sensors. (4) DGASummary rewrite: TDCG bar with IEEE C57.104 thresholds, CO₂/CO ratio bar, gas rates with time-to-threshold countdown. (5) OperatingEnvelopeChart (NEW): Load% vs Top Oil scatter + IEC 60076-7 model curve + deviation-colored historical points + CAUTION/WARNING/CRITICAL reference lines. (6) Physics tab now defaults to Operating Envelope sub-tab. (7) Scenario-start equipment alarms (5 scenarios, SCADA-authentic descriptions). (8) DGA baseline → realistic 17-year-old transformer (H2:25, CO:120, CO2:900, CO₂/CO=7.5). 28/28 backend + 125/125 frontend tests pass. |

@@ -276,6 +276,10 @@ class SimulatorEngine:
         # Stores (sim_time, health_score) tuples for degradation rate computation.
         self._health_score_history: deque[tuple[float, float]] = deque(maxlen=PROGNOSTICS_HISTORY_LEN)
 
+        # --- Scenario transition tracking ---
+        # Used to detect scenario changes and emit equipment-fault startup alerts.
+        self._last_scenario_id: str = "normal"
+
         # Callbacks registered by the WebSocket handler / persistence layer
         self._sensor_callbacks: list = []
         self._health_callbacks: list = []
@@ -491,6 +495,14 @@ class SimulatorEngine:
         self.state.top_oil_temp = add_noise("TOP_OIL_TEMP", thermal.top_oil_temp + top_oil_delta)
         self.state.bot_oil_temp = add_noise("BOT_OIL_TEMP", thermal.bot_oil_temp)
         self.state.winding_temp = add_noise("WINDING_TEMP", thermal.winding_temp)
+
+        # --- 7b. Capture physics-based "expected" values (IEC 60076-7 model predictions).
+        #         These are what the model says temperatures SHOULD be at current
+        #         load/ambient/cooling with no fault. The gap (actual - expected) is
+        #         the digital-twin fault signature displayed in the sensor panel.
+        self.state.expected_top_oil_temp = round(thermal.top_oil_temp, 1)
+        self.state.expected_bot_oil_temp = round(thermal.bot_oil_temp, 1)
+        self.state.expected_winding_temp = round(thermal.winding_temp_physics, 1)
         self.state.load_current = add_noise("LOAD_CURRENT", round(load_fraction * 100.0, 1))
         self.state.ambient_temp = add_noise("AMBIENT_TEMP", ambient_temp)
         self.state.cooling_mode = cooling_mode
@@ -529,6 +541,13 @@ class SimulatorEngine:
 
         # --- 10. Emit sensor group updates at their scheduled intervals ---
         now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        # --- 10a. Scenario transition: emit equipment-specific startup alert ---
+        current_scenario_id = self.scenario_manager.active_scenario.scenario_id
+        if current_scenario_id != self._last_scenario_id:
+            if current_scenario_id != "normal":
+                await self._emit_scenario_start_alert(current_scenario_id, now_iso)
+            self._last_scenario_id = current_scenario_id
 
         thermal_due = self.sim_time - self._last_thermal_emit >= THERMAL_UPDATE_INTERVAL_SIM_S
         equip_due   = self.sim_time - self._last_equip_emit   >= EQUIPMENT_UPDATE_INTERVAL_SIM_S
@@ -829,6 +848,131 @@ class SimulatorEngine:
             {"type": "persist_alert", "alert": alert_schema},
         )
 
+    async def _emit_scenario_start_alert(self, scenario_id: str, timestamp: str) -> None:
+        """Emit an equipment/operational alert when a fault scenario begins.
+
+        In real SCADA systems, faults begin with an equipment event (fan trips,
+        protection relay operates, etc.) BEFORE thermal consequences are seen.
+        This makes scenarios feel physically real — the cause precedes the effect.
+
+        Args:
+            scenario_id: The newly activated scenario ID.
+            timestamp: ISO 8601 UTC timestamp string.
+        """
+        # Scenario-specific startup alert definitions
+        _SCENARIO_START_ALERTS: dict[str, dict] = {
+            "hot_spot": {
+                "severity": "WARNING",
+                "title": "Abnormal Winding Temperature Rise Detected",
+                "description": (
+                    "Online thermal model (IEC 60076-7) detects winding temperature "
+                    "exceeding model prediction by >10°C at current load. "
+                    "Possible cause: blocked cooling duct or insulation degradation. "
+                    "Monitoring gas evolution for FM-001 confirmation."
+                ),
+                "sensor_ids": ["WINDING_TEMP", "TOP_OIL_TEMP"],
+                "actions": [
+                    "Check that all cooling fans are running",
+                    "Monitor winding temperature trend closely",
+                    "Reduce load to 70% if temperature deviation exceeds 15°C",
+                    "Dispatch DGA oil sampling crew within 4 hours",
+                ],
+            },
+            "cooling_failure": {
+                "severity": "CRITICAL",
+                "title": "EQUIPMENT ALARM: Cooling Fan Protection Tripped",
+                "description": (
+                    "Fan Bank 1 motor overcurrent protection has operated. "
+                    "Cooling capacity reduced to ONAN (natural convection only). "
+                    "Top oil temperature will rise progressively. "
+                    "Immediate field inspection required."
+                ),
+                "sensor_ids": ["FAN_BANK_1", "FAN_BANK_2", "TOP_OIL_TEMP"],
+                "actions": [
+                    "IMMEDIATE: Dispatch maintenance crew to inspect Fan Bank 1",
+                    "Check fan motor circuit breakers and contactors",
+                    "Reduce transformer load to 60% or below until cooling is restored",
+                    "If top oil exceeds 85°C before repair: initiate load transfer",
+                    "Test fan motor insulation resistance after repair",
+                ],
+            },
+            "arcing": {
+                "severity": "CRITICAL",
+                "title": "PROTECTION ALERT: Buchholz Relay Pre-Trip Condition",
+                "description": (
+                    "Buchholz relay gas accumulation rate has exceeded normal levels. "
+                    "C₂H₂ and H₂ gases rising rapidly — consistent with internal arcing. "
+                    "Discharge activity detected. Immediate action required."
+                ),
+                "sensor_ids": ["DGA_C2H2", "DGA_H2"],
+                "actions": [
+                    "IMMEDIATE: Reduce load to minimum (<40% rated)",
+                    "Check Buchholz relay indicator float position",
+                    "Call transformer engineer and operations manager",
+                    "Prepare for emergency controlled shutdown if C2H2 > 35 ppm",
+                    "Do NOT re-energize without engineering approval",
+                ],
+            },
+            "partial_discharge": {
+                "severity": "WARNING",
+                "title": "Online Monitor: Partial Discharge Activity Increasing",
+                "description": (
+                    "H₂ generation rate has increased 40% above baseline trend. "
+                    "Gas analysis pattern consistent with partial discharge (Duval PD zone). "
+                    "Ultrasonic PD testing recommended within 5 days."
+                ),
+                "sensor_ids": ["DGA_H2", "DGA_CH4", "BUSHING_CAP_HV"],
+                "actions": [
+                    "Schedule ultrasonic partial discharge test within 5 days",
+                    "Check bushing capacitance for drift",
+                    "Increase DGA monitoring frequency to daily",
+                    "Reduce loading to 85% to minimize electrical stress",
+                ],
+            },
+            "paper_degradation": {
+                "severity": "WARNING",
+                "title": "Insulation Aging Monitor: CO/CO₂ Ratio Declining",
+                "description": (
+                    "CO₂/CO ratio has fallen below 11 and is trending downward. "
+                    "Rate of CO generation has increased above normal aging baseline. "
+                    "Pattern consistent with accelerated cellulose paper degradation. "
+                    "Furan compound analysis recommended."
+                ),
+                "sensor_ids": ["DGA_CO", "DGA_CO2", "WINDING_TEMP"],
+                "actions": [
+                    "Schedule furan compound oil analysis within 72 hours",
+                    "Review loading history for sustained overloads",
+                    "Reduce average loading to 80% to slow paper aging",
+                    "Calculate remaining insulation life using DP (degree of polymerization) test",
+                ],
+            },
+        }
+
+        alert_info = _SCENARIO_START_ALERTS.get(scenario_id)
+        if not alert_info:
+            return
+
+        self._alert_seq += 1
+        alert_dict = {
+            "type": "alert",
+            "alert": {
+                "id": self._alert_seq,
+                "timestamp": timestamp,
+                "severity": alert_info["severity"],
+                "title": alert_info["title"],
+                "description": alert_info["description"],
+                "source": "THRESHOLD",
+                "sensor_ids": alert_info["sensor_ids"],
+                "failure_mode_id": None,
+                "recommended_actions": alert_info["actions"],
+                "acknowledged": False,
+                "acknowledged_at": None,
+                "sim_time": self.sim_time,
+            },
+        }
+        await self._fire_callbacks(self._alert_callbacks, alert_dict)
+        logger.info("Scenario start alert emitted for '%s'", scenario_id)
+
     async def _emit_health_update(
         self, health_result: dict, new_score: float, timestamp: str
     ) -> None:
@@ -885,13 +1029,19 @@ class SimulatorEngine:
                 "status": status,
             }
 
-        # Add `expected` field for thermal sensors (rolling mean from anomaly detector)
+        # Add `expected` field for thermal sensors using IEC 60076-7 model prediction.
+        # This is the digital-twin paradigm: model prediction vs actual reading.
+        # "Expected" = what physics says it should be at current load/ambient/cooling
+        # without any fault. Deviation = fault signature, not statistical noise.
         if group == "thermal":
-            for sid in ("TOP_OIL_TEMP", "BOT_OIL_TEMP", "WINDING_TEMP"):
-                if sid in sensors:
-                    hist = list(self.anomaly_detector._history.get(sid, []))
-                    if len(hist) >= 5:
-                        sensors[sid]["expected"] = round(sum(hist) / len(hist), 1)
+            expected_map = {
+                "TOP_OIL_TEMP": self.state.expected_top_oil_temp,
+                "BOT_OIL_TEMP": self.state.expected_bot_oil_temp,
+                "WINDING_TEMP": self.state.expected_winding_temp,
+            }
+            for sid, exp_val in expected_map.items():
+                if sid in sensors and exp_val > 0:
+                    sensors[sid]["expected"] = exp_val
 
         message = {
             "type": "sensor_update",

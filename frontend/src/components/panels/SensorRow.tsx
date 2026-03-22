@@ -1,4 +1,5 @@
-// Single sensor row: name, value, status dot, trend arrow, limit bar, sparkline
+// Single sensor row: name, value, status dot, trend arrow, limit bar, sparkline,
+// and (for thermal sensors) model-vs-actual deviation — the core digital twin signal.
 
 import { memo } from 'react'
 import { StatusDot } from '../common/StatusDot'
@@ -8,6 +9,9 @@ import { useSensorReading } from '../../store/selectors'
 import { SENSOR_META } from '../../lib/constants'
 import { formatSensorValue } from '../../lib/formatters'
 import type { SensorId } from '../../types/sensors'
+
+// Thermal sensors that have a physics-based model prediction (IEC 60076-7)
+const THERMAL_MODEL_SENSORS = new Set<SensorId>(['TOP_OIL_TEMP', 'WINDING_TEMP', 'BOT_OIL_TEMP'])
 
 export interface SensorRowProps {
   sensorId: SensorId
@@ -59,6 +63,40 @@ function LimitBar({ value, sensorId, status }: { value: number; sensorId: Sensor
   )
 }
 
+// ─── Model vs Actual deviation (digital twin core signal) ─────────────────────
+// Shows the IEC 60076-7 physics model prediction alongside the actual reading.
+// The deviation (actual − model) is the fault signature — not statistical noise.
+
+function ModelDeviation({ actual, expected, unit }: { actual: number; expected: number; unit: string }) {
+  const deviation = actual - expected
+  const absDev = Math.abs(deviation)
+
+  // Only show when deviation is meaningful (>0.5°C)
+  if (absDev < 0.5) return null
+
+  const sign = deviation > 0 ? '+' : '−'
+  const isHot = deviation > 0
+
+  // Color-code by deviation magnitude (>5°C caution, >10°C warning, >15°C critical)
+  const devColor =
+    absDev >= 15 ? 'text-red-400'
+    : absDev >= 10 ? 'text-orange-400'
+    : absDev >= 5  ? 'text-yellow-400'
+    : 'text-slate-500'
+
+  return (
+    <div
+      className="flex items-center gap-1 flex-shrink-0"
+      title={`IEC 60076-7 model predicts ${expected.toFixed(1)}${unit}. Actual ${isHot ? 'exceeds' : 'is below'} model by ${absDev.toFixed(1)}${unit}.`}
+    >
+      <span className="text-[8px] text-slate-600 font-mono">mdl</span>
+      <span className={`text-[9px] font-mono font-semibold ${devColor}`}>
+        {sign}{absDev.toFixed(1)}{unit}
+      </span>
+    </div>
+  )
+}
+
 // ─── SensorRow ────────────────────────────────────────────────────────────────
 
 export const SensorRow = memo(function SensorRow({ sensorId }: SensorRowProps) {
@@ -73,28 +111,60 @@ export const SensorRow = memo(function SensorRow({ sensorId }: SensorRowProps) {
 
   const trend = isOnOff ? 'stable' : computeTrend(points.map((p) => p.value))
 
+  // Physics-based model prediction (only for thermal sensors with IEC 60076-7 model)
+  const expected = reading?.expected
+  const hasModelDev = (
+    THERMAL_MODEL_SENSORS.has(sensorId) &&
+    expected !== undefined &&
+    latestValue !== undefined
+  )
+
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#252840] hover:bg-[#252840] transition-colors">
-      <StatusDot status={status} size="sm" />
-      <span className="flex-1 text-xs text-slate-300 truncate">{label}</span>
+    <div className="flex flex-col border-b border-[#252840] hover:bg-[#252840] transition-colors">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <StatusDot status={status} size="sm" />
+        <span className="flex-1 text-xs text-slate-300 truncate">{label}</span>
 
-      {!isOnOff && <TrendArrow trend={trend} status={status} />}
+        {!isOnOff && <TrendArrow trend={trend} status={status} />}
 
-      <span className="text-xs font-mono w-20 text-right">
-        {status === 'ON'
-          ? <span className="text-green-400">ON</span>
-          : status === 'OFF'
-          ? <span className="text-slate-500">OFF</span>
-          : <span className="text-slate-200">{latestValue !== undefined ? formatSensorValue(latestValue, unit) : '—'}</span>}
-      </span>
+        {/* Model deviation badge — only for thermal sensors */}
+        {hasModelDev && (
+          <ModelDeviation actual={latestValue!} expected={expected!} unit={unit} />
+        )}
 
-      {!isOnOff && latestValue !== undefined && (
-        <LimitBar value={latestValue} sensorId={sensorId} status={status} />
-      )}
+        <span className="text-xs font-mono w-20 text-right">
+          {status === 'ON'
+            ? <span className="text-green-400">ON</span>
+            : status === 'OFF'
+            ? <span className="text-slate-500">OFF</span>
+            : <span className="text-slate-200">{latestValue !== undefined ? formatSensorValue(latestValue, unit) : '—'}</span>}
+        </span>
 
-      <div className="w-20 flex-shrink-0">
-        <SensorSparkline sensorId={sensorId} status={status} height={24} />
+        {!isOnOff && latestValue !== undefined && (
+          <LimitBar value={latestValue} sensorId={sensorId} status={status} />
+        )}
+
+        <div className="w-20 flex-shrink-0">
+          <SensorSparkline sensorId={sensorId} status={status} height={24} />
+        </div>
       </div>
+
+      {/* Physics model context line — visible when deviation is significant */}
+      {hasModelDev && Math.abs(latestValue! - expected!) >= 2.0 && (
+        <div className="flex items-center gap-2 px-3 pb-1 -mt-0.5">
+          <div className="w-1.5 flex-shrink-0" /> {/* spacer for status dot width */}
+          <span className="text-[9px] text-slate-600">
+            IEC model: <span className="font-mono text-slate-500">{expected!.toFixed(1)}{unit}</span>
+            <span className="mx-1">·</span>
+            actual: <span className={`font-mono ${
+              Math.abs(latestValue! - expected!) >= 15 ? 'text-red-400'
+              : Math.abs(latestValue! - expected!) >= 10 ? 'text-orange-400'
+              : Math.abs(latestValue! - expected!) >= 5  ? 'text-yellow-400'
+              : 'text-slate-400'
+            }`}>{latestValue!.toFixed(1)}{unit}</span>
+          </span>
+        </div>
+      )}
     </div>
   )
 })

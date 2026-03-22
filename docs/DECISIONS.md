@@ -159,4 +159,25 @@
 - **Rationale**: Applying overrides as physics inputs means the IEC 60076-7 thermal model computes the correct response — load reduction reduces winding power dissipation → slower heat generation → temperatures plateau and decline. This is what a real digital twin should do: simulate the consequence of operator actions.
 - **Trade-off**: Operator overrides persist indefinitely until explicitly cleared. If a scenario completes while overrides are set, the operator must manually clear them. This is acceptable and physically realistic — operators don't automatically restore normal load when an alarm clears.
 
+## ADR-023: Physics-based expected values separated from fault-affected actuals (Session 16)
+- **Date**: 2026-03-21
+- **Context**: The original "expected" value sent to the frontend used a rolling statistical mean — which is a lag indicator, not a physics model. A true digital twin's core signal is: physics model says X, reality says Y, deviation = fault signature.
+- **Decision**: Added `winding_temp_physics` to `ThermalState` (pure IEC 60076-7 output before any scenario `winding_delta` is applied). Added `expected_top_oil_temp/winding_temp/bot_oil_temp` to `TransformerState`. Engine captures these AFTER thermal model tick but BEFORE scenario modifiers, emitting them as `expected` fields on thermal sensor readings.
+- **Rationale**: `thermal.top_oil_temp` is already the clean physics value (top_oil_delta is applied to `state.top_oil_temp` separately in the engine, not inside the model). `winding_temp` includes `winding_delta` from fault scenarios, so the model needed a separate `winding_temp_physics` field. This enables the SensorRow to show "mdl +12.3°C" — the IEC model says 68°C, actual is 80.3°C, the 12.3°C gap is the fault.
+- **Trade-off**: Slight duplication (expected values stored on TransformerState and also carried in SensorReading). Accepted — they serve different purposes: state field drives REST API responses, SensorReading field drives real-time WebSocket overlay.
+
+## ADR-024: Operating Envelope as the primary Physics sub-tab (Session 16)
+- **Date**: 2026-03-21
+- **Context**: The Physics tab originally defaulted to the Correlation (temporal) chart. The Operating Envelope (Load% vs Temperature scatter with IEC model curve) is the more compelling DT visualization for demonstrating fault detection.
+- **Decision**: Physics tab defaults to "Envelope" sub-tab. The IEC 60076-7 thermal model is also re-implemented in the frontend (`iecModelTopOil()`) so the model curve updates instantly with cooling mode changes without a round-trip to the backend.
+- **Rationale**: The Operating Envelope embodies the "actual vs. expected" paradigm visually. Scatter points above the blue curve = fault. A single glance communicates the entire digital twin value proposition. Re-implementing the simple model formula in JS is justified — it's 5 lines of math that avoids a polling round-trip.
+- **Trade-off**: Frontend and backend now both implement `iecModelTopOil()`. If parameters change in `config.py`, the frontend constants must be manually updated. Mitigated by prominent comments in OperatingEnvelopeChart.tsx noting they must match backend config.py.
+
+## ADR-025: Scenario-start equipment alarms use SCADA-authentic descriptions (Session 16)
+- **Date**: 2026-03-21
+- **Context**: Previous scenario transitions produced no immediate alert — the operator had no warning until temperatures climbed above thresholds. Real SCADA systems fire equipment alarms (Buchholz relay, protection relay, overcurrent trip) before thermal consequences.
+- **Decision**: `_emit_scenario_start_alert()` fires one CRITICAL/WARNING alert on scenario activation with sensor-specific descriptions matching what real SCADA operators see — "Buchholz Relay Pre-Trip Condition" for arcing, "Cooling Fan Protection Tripped — Overcurrent" for cooling_failure, "Abnormal Winding Temperature Rise Detected" for hot_spot, etc.
+- **Rationale**: Equipment protection relays respond to electrical signals (gas pressure, current, impedance change) in seconds — long before thermal sensors register. This is the correct sequence for all five fault types. Without this, the system felt like pure telemetry monitoring rather than a protection system.
+- **Trade-off**: Scenario-start alerts don't repeat if the scenario is re-triggered without returning to normal. The `_last_scenario_id` guard prevents duplicate emission. If the same scenario is started twice consecutively, no second alert fires — acceptable.
+
 *Add new ADRs below as decisions are made during implementation.*

@@ -395,16 +395,20 @@ DGA_PAPER_THRESHOLD_C: float = 140.0
 DGA_PAPER_CO_EXTRA_FACTOR: float = 5.0
 DGA_PAPER_CO2_EXTRA_FACTOR: float = 3.0
 
-# Starting (initial) gas levels for a well-maintained transformer.
-# Mid-range of IEC 60599 "typical" values for a healthy 20-year-old transformer.
+# Starting (initial) gas levels for TRF-001 (est. 2009, now 17 years in service).
+# Based on IEC 60599:2022 Table 1 "typical" values for a well-maintained aged unit.
+# CO=120 ppm and CO2=900 ppm represent ~17 years of normal cellulose paper aging.
+# CO2/CO ratio = 7.5 → within normal aging range (5–13 per IEEE C57.104).
+# C2H2=0.5 ppm within normal aging range — no previous arcing events.
+# TDCG baseline = 25+12+15+4+0.5+120 = 176.5 ppm — well within Level 1 (<720 ppm).
 DGA_INITIAL_PPM: dict[str, float] = {
-    "DGA_H2":   15.0,
-    "DGA_CH4":   8.0,
-    "DGA_C2H6": 12.0,
-    "DGA_C2H4":  3.0,
-    "DGA_C2H2":  0.2,
-    "DGA_CO":   80.0,
-    "DGA_CO2":  600.0,
+    "DGA_H2":   25.0,   # Background H2 from normal aging (typical 10–50 ppm)
+    "DGA_CH4":  12.0,   # Background methane (typical 5–20 ppm for aged unit)
+    "DGA_C2H6": 15.0,   # Ethane — slightly elevated from years of thermal cycling
+    "DGA_C2H4":  4.0,   # Low ethylene — no significant thermal fault history
+    "DGA_C2H2":  0.5,   # Near-zero acetylene — no arcing events in service history
+    "DGA_CO":  120.0,   # Carbon monoxide from 17 years of paper aging
+    "DGA_CO2": 900.0,   # CO2: ratio 7.5 → normal paper aging (IEEE C57.104 normal range)
 }
 
 # ---------------------------------------------------------------------------
