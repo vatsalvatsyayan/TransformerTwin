@@ -11,6 +11,7 @@ import type { ConnectionState } from '../types/websocket'
 import type { DecisionResponse } from '../types/decision'
 import type { OperatorStatus } from '../types/operator'
 import type { PrognosticsResponse } from '../types/prognostics'
+import type { TimelineEvent } from '../types/timeline'
 
 /** Maximum history points kept per sensor in the in-memory ring buffer */
 export const SENSOR_HISTORY_BUFFER_SIZE = 720
@@ -69,6 +70,9 @@ export interface AppState {
   // --- Health component selection (drives 3D highlight) ---
   selectedHealthComponent: HealthComponentKey | null
 
+  // --- Timeline ---
+  timelineEvents: TimelineEvent[]
+
   // --- Playback ---
   mode: PlaybackMode
   playbackPosition: string | null
@@ -113,6 +117,7 @@ export interface AppState {
   setOperatorStatus: (status: OperatorStatus) => void
   setSelectedHealthComponent: (key: HealthComponentKey | null) => void
   setPrognostics: (prog: PrognosticsResponse) => void
+  addTimelineEvent: (event: TimelineEvent) => void
 }
 
 export const useStore = create<AppState>()((set) => ({
@@ -145,6 +150,7 @@ export const useStore = create<AppState>()((set) => ({
   operatorStatus: null,
   prognostics: null,
   selectedHealthComponent: null,
+  timelineEvents: [],
   mode: 'live',
   playbackPosition: null,
   isPlaying: false,
@@ -243,4 +249,8 @@ export const useStore = create<AppState>()((set) => ({
   setOperatorStatus: (status) => set({ operatorStatus: status }),
   setSelectedHealthComponent: (key) => set({ selectedHealthComponent: key }),
   setPrognostics: (prog) => set({ prognostics: prog }),
+  addTimelineEvent: (event) =>
+    set((state) => ({
+      timelineEvents: [event, ...state.timelineEvents].slice(0, 300), // cap at 300 events
+    })),
 }))

@@ -1,4 +1,4 @@
-// Tab switcher for right panel
+// Tab switcher for right panel — 8 tabs including Timeline and Physics
 
 import { memo, useState } from 'react'
 import { SensorPanel } from './SensorPanel'
@@ -7,29 +7,32 @@ import { FMEAPanel } from './FMEAPanel'
 import { WhatIfPanel } from './WhatIfPanel'
 import { AlertPanel } from './AlertPanel'
 import { DecisionPanel } from './DecisionPanel'
+import { EventTimeline } from './EventTimeline'
+import { CorrelationChart } from '../charts/CorrelationChart'
 import { useActiveAlertCount } from '../../store/selectors'
 import { useStore } from '../../store'
 import { HealthGauge } from '../health/HealthGauge'
 import { HealthBreakdown } from '../health/HealthBreakdown'
 import { ScenarioProgressBar } from '../common/ScenarioProgressBar'
 
-const TABS = ['Sensors', 'DGA', 'FMEA', 'Decision', 'What-If', 'Alerts'] as const
+const TABS = ['Sensors', 'DGA', 'FMEA', 'Decision', 'What-If', 'Alerts', 'Timeline', 'Physics'] as const
 type Tab = (typeof TABS)[number]
 
 export const TabContainer = memo(function TabContainer() {
   const [activeTab, setActiveTab] = useState<Tab>('Sensors')
-  const alertCount = useActiveAlertCount()
-  const decisionRisk = useStore((s) => s.decision?.risk_level)
+  const alertCount    = useActiveAlertCount()
+  const decisionRisk  = useStore((s) => s.decision?.risk_level)
+  const timelineCount = useStore((s) => s.timelineEvents.length)
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab bar */}
-      <div className="flex border-b border-[#2d3148] flex-shrink-0 bg-[#1a1d27]">
+      {/* Tab bar — scrollable so all 8 tabs fit on narrow screens */}
+      <div className="flex border-b border-[#2d3148] flex-shrink-0 bg-[#1a1d27] overflow-x-auto">
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${
+            className={`px-3 py-2.5 text-xs font-medium transition-colors relative flex-shrink-0 ${
               activeTab === tab
                 ? 'text-white border-b-2 border-blue-500'
                 : 'text-slate-400 hover:text-slate-200'
@@ -45,6 +48,11 @@ export const TabContainer = memo(function TabContainer() {
               <span className={`ml-1 inline-flex items-center justify-center w-2 h-2 rounded-full ${
                 decisionRisk === 'CRITICAL' || decisionRisk === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'
               }`} />
+            )}
+            {tab === 'Timeline' && timelineCount > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-0.5 text-[9px] bg-slate-700 text-slate-300 rounded-full">
+                {timelineCount > 99 ? '99+' : timelineCount}
+              </span>
             )}
           </button>
         ))}
@@ -70,6 +78,8 @@ export const TabContainer = memo(function TabContainer() {
         {activeTab === 'Decision'  && <DecisionPanel />}
         {activeTab === 'What-If'   && <WhatIfPanel />}
         {activeTab === 'Alerts'    && <AlertPanel />}
+        {activeTab === 'Timeline'  && <EventTimeline />}
+        {activeTab === 'Physics'   && <CorrelationChart />}
       </div>
     </div>
   )

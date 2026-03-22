@@ -3,6 +3,7 @@
 
 import { useEffect } from 'react'
 import { Header } from './components/layout/Header'
+import { AssetKPIBar } from './components/layout/AssetKPIBar'
 import { MainLayout } from './components/layout/MainLayout'
 import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
@@ -47,6 +48,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-full">
       <Header />
+      <AssetKPIBar />
 
       {/* Disconnected banner — shows when WS drops after having been connected */}
       {isDisconnected && hasData && (

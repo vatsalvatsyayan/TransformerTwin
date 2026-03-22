@@ -1,11 +1,59 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 14 — Fault Cascade, Thermal Fatigue, Prognostics Engine)
+> Last updated: 2026-03-21 (Session 15 — Digital Twin Core: Thermal Heatmap, KPI Bar, Event Timeline, Physics Correlation)
 
 ---
 
-## Current Status: 🟢 Session 14 Complete — Fault Cascade, Thermal Fatigue, Prognostics Engine
+## Current Status: 🟢 Session 15 Complete — Digital Twin Visual & UX Overhaul
+
+### Session 15 Additions (2026-03-21)
+
+This session addresses the five most impactful gaps: **the project looked like a dashboard, not a digital twin.** All changes are frontend-only, additive. 125/125 tests still pass.
+
+**Why these 5?** A visitor couldn't answer: (1) what transformer is this? (2) where is the heat? (3) what happened and when? (4) is this reading abnormal? (5) does the physics actually work? — now they can.
+
+#### Asset KPI Bar (`AssetKPIBar.tsx` — NEW)
+Full-width strip between header and 3D viewer:
+- Transformer nameplate: TRF-001 | 100 MVA | 220/33 kV | ONAN/ONAF/OFAF | Siemens AG | Bay 3 Substation | Est. 2009
+- 5 live KPI tiles: Load Factor (% of rated), Winding Temp (% of 140°C limit), Top Oil Temp (% of 95°C limit), Health Index, Est. Time-to-Critical
+- Each tile has a color-coded fill bar (green→yellow→orange→red) and status sub-label
+- IEC 60076-7 / IEC 60599 / IEEE C57.104 standard badges — proves domain authenticity
+
+#### Thermal Gradient 3D Model (`Tank.tsx` — REWRITTEN)
+The tank body now **visualizes the oil thermal gradient** from bottom to top:
+- 5 horizontal slices interpolating BOT_OIL_TEMP (bottom) → TOP_OIL_TEMP (top) emissive colors
+- Temp→color: <50°C=no glow | 65°C=amber | 75°C=orange | 85°C=red | 95°C+=critical red
+- `lerpEmissive()`: hex-color interpolation for smooth gradient
+- Health selection highlight still overrides temperature gradient when active
+- This is the defining digital-twin visual: **you can SEE where heat accumulates in the oil column**
+
+#### Animated Oil Circulation (`RadiatorBank.tsx` — ENHANCED)
+When FAN_BANK_1, FAN_BANK_2, or OIL_PUMP_1 is ON:
+- 7 animated sky-blue particles (one per inter-fin channel) move upward via `useFrame`
+- Phase-staggered for realistic non-uniform flow; fade-out near top for seamless loop
+- Makes the cooling system VISUALLY ACTIVE — not just a color change
+
+#### Event Timeline Tab (`EventTimeline.tsx` + store + `useWebSocket.ts` — NEW TAB)
+Chronological operational log capturing everything that happens during a session:
+- Alert events, health drops (≥3pt), scenario stage changes, cascade events, connection events
+- Color-coded severity (info/caution/warning/critical) with left border + dot
+- Timeline tab shows event count badge; store caps at 300 events
+- New: `frontend/src/types/timeline.ts`, `TimelineEvent` in store, `addTimelineEvent` action
+
+#### Sensor Trend + Limit Bars (`SensorRow.tsx` — ENHANCED)
+- **Trend arrow**: ↑/→/↓ from last 4 readings; orange when rising+anomalous
+- **Limit bar**: 3px fill bar showing value as % of CRITICAL threshold, color-coded by status
+
+#### Physics Correlation Chart (`CorrelationChart.tsx` — NEW TAB "Physics")
+Dual Y-axis chart proving IEC 60076-7 thermal physics is working:
+- Load% (left, indigo) correlated with Top Oil °C (orange), Winding °C (red), Bot Oil °C (gray dashed) over time
+- IEC reference lines: 140°C winding, 95°C top-oil, 100% load limits
+- 3 explanation tiles: causal physics, thermal gradient theory, fault signature pattern
+- History aligned on sim_time, down-sampled to ≤120 points for performance
+
+#### Session 15 Log Entry
+| 2026-03-21 | 15 | Digital twin overhaul: AssetKPIBar (nameplate + 5 KPI tiles), Tank thermal gradient (5-slice BOT→TOP interpolation), RadiatorBank animated oil flow (useFrame particles), EventTimeline tab (alert/health/scenario/cascade events), SensorRow trend+limit bars, CorrelationChart Physics tab (dual Y-axis load vs temps). 125/125 tests, build clean. |
 
 ### Session 14 Additions (2026-03-21)
 
@@ -425,4 +473,5 @@ Target: Vitest + React Testing Library — per CLAUDE.md spec (was the only unim
 | 2026-03-21 | 9 | Comprehensive Playwright MCP QA of all 12 feature areas. Found and fixed 3 critical bugs: (1) HealthGauge + HealthBreakdown never rendered — added to TabContainer as always-visible strip; (2) anomaly detector min_std floor too small (1e-9) causing 1400+ alert flood — fixed to 1% of sensor range; (3) historical playback snapshot route not registered because backend was started without --reload before route was added — restarted backend. All features now verified: WebSocket, header controls, 3D model, 21 sensors + sparklines, health gauge/breakdown, DGA/Duval Triangle, FMEA, What-If, alerts, hot-spot scenario, arcing scenario, playback scrubber. ADR-019, ADR-020 logged. ISSUE-017, ISSUE-018, ISSUE-019 resolved. | Project fully demo-ready |
 | 2026-03-21 | 12 | Decision Support System. Added 100×/200× speed options. Added per-sensor recommended_actions to anomaly alerts. Created DecisionEngine (risk, RUL, economic impact, runbooks) + GET /api/decision + DecisionPanel frontend tab. Decision panel shows: risk assessment (5-dot visual), recommended action with deadline, 3-scenario economic impact table ($16k now vs $3.8M failure), 8 operator runbooks with interactive checkboxes. Frontend build clean (tsc + vite). Backend imports verified. | Session 13 |
 | 2026-03-21 | 13 | Operator Controls + Speed 200× fix + Health→3D highlight. SpeedUpdateRequestSchema le=60→200. Health breakdown rows clickable, selected component highlights cyan in 3D model via useHealthColor. New routes_operator.py (POST /api/operator/actions, GET /api/operator/status). Engine applies load/cooling overrides before physics. DecisionPanel: Operator Controls section (Load/Cooling buttons) + active overrides green banner. 28/28 + 125/125 tests. | Session 14 |
-| 2026-03-21 | 14 | Fault Cascade + Thermal Fatigue + Prognostics Engine. Engine gains cascade tracking (_winding_critical_duration → injects C₂H₂/H₂ DGA after 5 sim-min CRITICAL), thermal stress integral (_thermal_stress_integral → fatigue_score 0–1). New analytics/prognostics.py: linear regression on health history → degradation rate, time-to-warning/critical, 24h/48h/72h projections. New GET /api/prognostics. New PrognosticsWidget in Decision tab. FMEACard: visual causal evidence chain. ScenarioProgressBar: cascade emergency banner. Frontend build clean. | Deploy and demo |
+| 2026-03-21 | 14 | Fault Cascade + Thermal Fatigue + Prognostics Engine. Engine gains cascade tracking (_winding_critical_duration → injects C₂H₂/H₂ DGA after 5 sim-min CRITICAL), thermal stress integral (_thermal_stress_integral → fatigue_score 0–1). New analytics/prognostics.py: linear regression on health history → degradation rate, time-to-warning/critical, 24h/48h/72h projections. New GET /api/prognostics. New PrognosticsWidget in Decision tab. FMEACard: visual causal evidence chain. ScenarioProgressBar: cascade emergency banner. Frontend build clean. | Digital twin UX overhaul |
+| 2026-03-21 | 15 | Digital Twin Core Overhaul (all 5 changes frontend-only). (1) AssetKPIBar: transformer nameplate + 5 live KPI tiles with limit bars. (2) Tank.tsx thermal gradient: 5-slice BOT→TOP oil temp emissive interpolation — you can see the heat in the oil column. (3) RadiatorBank.tsx animated oil flow: useFrame particles when fans/pump ON. (4) EventTimeline tab: chronological operational log (alerts, health drops, scenario stages, cascade events). (5) SensorRow trend arrows + limit bars. (6) Physics tab with CorrelationChart: dual Y-axis Load% vs Temps proving IEC 60076-7 causality. 125/125 frontend tests, build clean. | Demo-ready |
