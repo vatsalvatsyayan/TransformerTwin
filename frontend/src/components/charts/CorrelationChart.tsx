@@ -86,6 +86,19 @@ export const CorrelationChart = memo(function CorrelationChart() {
     [loadHistory, topOilHistory, windingHistory, botOilHistory],
   )
 
+  // Auto-scale temp axis to data range ± 10% padding.
+  // Fixed 0–150°C range made normal-operation data (25–45°C) appear flat at the
+  // bottom. Dynamic range keeps the data legible while still showing reference lines.
+  const tempDomain = useMemo((): [number, number] => {
+    const allTemps = data.flatMap((d) => [d.topOil, d.winding, d.botOil]).filter((v): v is number => v !== null)
+    if (allTemps.length === 0) return [0, 150]
+    const minT = Math.min(...allTemps)
+    const maxT = Math.max(...allTemps)
+    const pad  = Math.max(5, (maxT - minT) * 0.1)
+    // Round to nearest 5°C for clean tick marks; keep 95°C reference line visible
+    return [Math.floor((minT - pad) / 5) * 5, Math.ceil(Math.max(maxT + pad, 100) / 5) * 5]
+  }, [data])
+
   if (data.length < 5) {
     return (
       <div className="flex flex-col items-center gap-2 py-8 text-slate-600">
@@ -133,11 +146,11 @@ export const CorrelationChart = memo(function CorrelationChart() {
             width={32}
           />
 
-          {/* Right Y-axis: Temperature °C */}
+          {/* Right Y-axis: Temperature °C — auto-scaled to data range */}
           <YAxis
             yAxisId="temp"
             orientation="right"
-            domain={[0, 150]}
+            domain={tempDomain}
             tickFormatter={(v: number) => `${v}°`}
             tick={{ fill: '#64748b', fontSize: 9 }}
             axisLine={false}

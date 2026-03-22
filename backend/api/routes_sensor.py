@@ -15,6 +15,7 @@ from config import (
     SENSOR_HISTORY_DEFAULT_LIMIT,
     SENSOR_HISTORY_MAX_LIMIT,
     SENSOR_UNITS,
+    EQUIPMENT_SENSOR_IDS,
 )
 from database import queries
 from models.schemas import (
@@ -100,14 +101,26 @@ async def get_sensors_snapshot(
     response_timestamp: str = latest_row["timestamp"]
     response_sim_time: float = latest_row["sim_time"]
 
+    # Boolean sensors (fans, pump) are stored in SQLite as REAL (0.0/1.0).
+    # The live engine's isinstance(value, bool) check doesn't apply to DB rows.
+    # Map them back to "ON"/"OFF" so playback matches live behaviour.
+    _BOOLEAN_SENSOR_IDS: frozenset[str] = frozenset(
+        sid for sid in EQUIPMENT_SENSOR_IDS if SENSOR_UNITS.get(sid) == "boolean"
+    )
+
     sensors: dict[str, SensorReadingSchema] = {}
     for sid in ALL_SENSOR_IDS:
         row = row_by_sensor.get(sid)
         if row is not None:
+            value = float(row["value"])
+            if sid in _BOOLEAN_SENSOR_IDS:
+                status = "ON" if value >= 0.5 else "OFF"
+            else:
+                status = str(row["status"])
             sensors[sid] = SensorReadingSchema(
-                value=float(row["value"]),
+                value=value,
                 unit=SENSOR_UNITS.get(sid, ""),
-                status=str(row["status"]),
+                status=status,
             )
         else:
             # Sensor has no reading at or before sim_time — use a zero placeholder

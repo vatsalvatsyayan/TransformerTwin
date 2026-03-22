@@ -1,7 +1,44 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 17 — Bug fixes: WebSocket stability, compact health strip, layout height)
+> Last updated: 2026-03-22 (Session 18 — Comprehensive QA analysis + 8 bug fixes from analysis.md)
+
+---
+
+## Current Status: 🟢 Session 18 Complete — QA Analysis + 8 Bug Fixes
+
+### Session 18 Additions (2026-03-22)
+
+**Context**: Ran full Playwright QA across all 14 feature areas (see `docs/analysis.md`). Found 4 bugs during live testing (BUG-001→004), plus addressed all 4 outstanding issues from ISSUES.md (ISSUE-027→030). All 8 items now resolved.
+
+#### BUG-001 Fixed: App crash on first load (SensorRow.tsx)
+- `expected != null` guard (was `!== undefined`): backend sends `null` on first tick, not `undefined`. This crashed `null.toFixed(1)` in every render. Now safe.
+
+#### BUG-002 Fixed: FAN_BANK/OIL_PUMP showed raw sensor IDs (constants.ts)
+- Added SENSOR_META entries for `FAN_BANK_1`, `FAN_BANK_2`, `OIL_PUMP_1` so labels show "Fan Bank 1" etc.
+
+#### BUG-003 Fixed: OIL_DIELECTRIC LimitBar always at 100% (constants.ts, SensorRow.tsx)
+- Added `invertedScale?: boolean` to `SensorMeta`. `OIL_DIELECTRIC` now shows ~0% fill (healthy) for 54 kV and fills toward 100% as voltage approaches 30 kV (critical minimum).
+
+#### BUG-004 Fixed: "−7.4°C above model" for below-model readings (OperatingEnvelopeChart.tsx)
+- Made "above/below" direction word dynamic based on deviation sign.
+
+#### ISSUE-027 Fixed: Anomaly alert flood during high-speed operation
+- `AnomalyDetector.reset_history()` added — clears rolling baselines + last_status.
+- `SimulatorEngine.set_speed()` now calls `anomaly_detector.reset_history()` when speed changes. Forces 20-sample quiet period before any new alerts can fire.
+
+#### ISSUE-028 Fixed: Direction-agnostic recommended actions
+- Added `_ANOMALY_RECOMMENDED_ACTIONS_BELOW_MODEL` dict for TOP_OIL_TEMP, BOT_OIL_TEMP, WINDING_TEMP.
+- `_emit_anomaly_alert()` selects the below-model actions when `deviation_pct < 0` for thermal sensors.
+
+#### ISSUE-029 Fixed: Snapshot API returns NORMAL for boolean fan/pump sensors
+- `GET /api/sensors/snapshot` now maps boolean sensors (where `SENSOR_UNITS[sid] == "boolean"`) to ON/OFF status based on stored float value (≥0.5 → ON, <0.5 → OFF).
+
+#### ISSUE-030 Fixed: Physics Correlation Y-axis fixed at 0–150°C
+- `CorrelationChart.tsx` now computes `tempDomain` from actual data range ± 10% padding (rounded to nearest 5°C). Normal operation data (25–45°C) now fills the chart height.
+
+#### Session 18 Log Entry
+| 2026-03-22 | 18 | Comprehensive QA (analysis.md) + 8 bug fixes: BUG-001 null-guard crash, BUG-002 FAN/PUMP labels, BUG-003 invertedScale dielectric, BUG-004 above/below phrasing, ISSUE-027 anomaly reset on speed change, ISSUE-028 direction-aware actions, ISSUE-029 snapshot boolean ON/OFF, ISSUE-030 auto-scale correlation Y. 28/28 backend tests pass. |
 
 ---
 

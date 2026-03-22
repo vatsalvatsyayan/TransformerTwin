@@ -146,6 +146,31 @@ _ANOMALY_RECOMMENDED_ACTIONS: dict[str, list[str]] = {
     ],
 }
 
+# Recommended actions when a thermal sensor reads BELOW the expected baseline.
+# A below-model reading indicates either a sensor fault or unexpectedly high
+# cooling capacity — NOT an overheating condition. Actions target sensor
+# verification rather than load reduction, which would be wrong advice.
+_ANOMALY_RECOMMENDED_ACTIONS_BELOW_MODEL: dict[str, list[str]] = {
+    "TOP_OIL_TEMP": [
+        "Verify sensor calibration — compare against secondary oil temperature indicator",
+        "Check RTD/thermocouple continuity; below-model reading may indicate a stuck sensor",
+        "Review ambient temperature measurements — unusually cold weather can explain below-model readings",
+        "If sensor verified correct: note that overcooling is not hazardous but log for trending",
+    ],
+    "BOT_OIL_TEMP": [
+        "Verify bottom-oil RTD calibration against top-oil reading",
+        "Check cooling pump is not running in bypass mode (could cause overcooling)",
+        "Confirm large top/bottom differential is not masking a hot spot higher in the oil",
+        "Log reading in operations log with ambient temperature context",
+    ],
+    "WINDING_TEMP": [
+        "Verify winding temperature indicator (WTI) calibration",
+        "Check winding temperature relay contacts and signal wiring",
+        "Below-model winding reading with normal oil temp may indicate WTI heater fault",
+        "Notify shift supervisor to arrange instrument inspection",
+    ],
+}
+
 
 def _compute_sensor_status(sensor_id: str, value: float) -> str:
     """Return the status string for a sensor value against its thresholds.
@@ -294,11 +319,27 @@ class SimulatorEngine:
     def set_speed(self, multiplier: int) -> None:
         """Change simulation speed multiplier (1–200).
 
+        Resets the anomaly detector's rolling history on speed changes.
+        At high speeds (100×–200×) the rolling z-score baseline shifts faster
+        than the 50-sample window can adapt, triggering floods of spurious
+        CAUTION/WARNING alerts for values still within safe operating bounds.
+        Resetting forces the detector to rebuild a valid baseline (20 samples)
+        before alerting again — a ~20-tick quiet period after each speed change.
+
         Args:
             multiplier: New time acceleration factor.
         """
+        old_speed = self.speed
         self.speed = max(1, min(200, multiplier))
-        logger.info("Simulation speed set to %dx", self.speed)
+        if self.speed != old_speed:
+            self.anomaly_detector.reset_history()
+            logger.info(
+                "Simulation speed changed %dx → %dx; anomaly baseline reset.",
+                old_speed,
+                self.speed,
+            )
+        else:
+            logger.info("Simulation speed set to %dx", self.speed)
 
     def set_operator_load(self, load_fraction: float | None) -> None:
         """Override the load fraction used in physics.  None restores normal profile.
@@ -741,7 +782,15 @@ class SimulatorEngine:
             f"Deviation: {deviation_pct:.1f}%.{trend_text}"
         )
 
-        recommended_actions = _ANOMALY_RECOMMENDED_ACTIONS.get(sensor_id, [])
+        # For thermal sensors, choose actions based on deviation direction.
+        # A below-model reading warrants sensor-verification steps, not load reduction.
+        _thermal_sensor_ids = {"TOP_OIL_TEMP", "BOT_OIL_TEMP", "WINDING_TEMP"}
+        if sensor_id in _thermal_sensor_ids and anomaly.get("deviation_pct", 0.0) < 0:
+            recommended_actions = _ANOMALY_RECOMMENDED_ACTIONS_BELOW_MODEL.get(
+                sensor_id, _ANOMALY_RECOMMENDED_ACTIONS.get(sensor_id, [])
+            )
+        else:
+            recommended_actions = _ANOMALY_RECOMMENDED_ACTIONS.get(sensor_id, [])
 
         alert_dict = {
             "type": "alert",

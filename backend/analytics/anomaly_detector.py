@@ -92,6 +92,20 @@ class AnomalyDetector:
             sid: "NORMAL" for sid in _MONITORED_SENSORS
         }
 
+    def reset_history(self) -> None:
+        """Clear all rolling history and last-status state.
+
+        Called when the simulation speed changes.  High-speed transitions
+        shift sensor baselines faster than the rolling window can adapt,
+        producing floods of spurious alerts.  Resetting forces the detector
+        to collect a fresh 20-sample baseline (_MIN_BASELINE_SAMPLES) before
+        any new anomaly alerts can fire.
+        """
+        for sid in _MONITORED_SENSORS:
+            self._history[sid].clear()
+            self._last_status[sid] = "NORMAL"
+        logger.debug("Anomaly detector history reset (speed change).")
+
     def feed(self, sensor_id: str, value: float) -> None:
         """Append a new value to the rolling history for a sensor.
 
