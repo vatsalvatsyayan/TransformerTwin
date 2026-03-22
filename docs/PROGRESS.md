@@ -1,7 +1,38 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-22 (Session 19 — Full Playwright QA + 6 targeted bug fixes from new analysis.md)
+> Last updated: 2026-03-22 (Session 20 — Comprehensive diagnosis + 5 bug fixes)
+
+---
+
+## Current Status: 🟢 Session 20 Complete — Comprehensive Diagnosis + 5 Bug Fixes
+
+### Session 20 Additions (2026-03-22)
+
+**Context**: User reported app broken after recent changes. Ran full app diagnosis via Playwright visual QA + backend tests + network inspection. Found 5 bugs (2 high severity, 3 low/medium), all fixed. 28/28 backend tests + 125/125 frontend tests continue to pass. Build clean.
+
+#### FIX-1 (HIGH): Cascade failure banner persists after Normal Operation (`engine.py`, `useWebSocket.ts`)
+- **Root cause (dual)**: `_emit_scenario_update()` is guarded by `if scenario_id != "normal"` so no WS message clears `cascade_triggered` on the frontend. Backend `_cascade_triggered` flag also took ~10 real min to decay at 1× speed.
+- **Fix**: Added `else` block on scenario-transition detection — immediately resets `_cascade_triggered=False`, `_winding_critical_duration=0`, and emits a final `scenario_update` with `cascade_triggered=False`. Added defensive `cascadeNow = scenario_id === 'normal' ? false : rawCascade` guard in `useWebSocket.ts`.
+
+#### FIX-2 (MEDIUM): Prognostics intervention projection double-counted warmup degradation (`prognostics.py`)
+- **Root cause**: `project_intervention()` subtracted `rate_per_hr * warmup` from `score_after_warmup` — which already included that warmup degradation — then added `intervention_rate_per_hr * remaining`. Double-subtraction produced overly pessimistic intervention scores.
+- **Fix**: Removed erroneous term. Formula: `score_after_warmup + intervention_rate_per_hr * remaining`.
+
+#### FIX-3 (LOW): WSSetSpeedSchema cap too restrictive (`schemas.py`, `websocket_handler.py`)
+- `WSSetSpeedSchema` had `le=60` while REST API and UI both support up to 200×.
+- **Fix**: Changed to `le=200`; error message updated to "1–200".
+
+#### FIX-4 (LOW): Frontend nameplate mismatch (`AssetKPIBar.tsx`)
+- Hardcoded "Siemens AG / 220/33kV / 2009" didn't match backend config (GE Vernova / 230/69kV / 2005).
+- **Fix**: Updated to match `config.py` TRANSFORMER_* constants exactly.
+
+#### FIX-5 (LOW): ISSUE-031 "Rapidly Degrading" label on fresh load (`prognostics.py`)
+- With 2 history points, a 0.1 pt health dip produced massive apparent rate → RAPIDLY_DEGRADING.
+- **Fix**: Added `n >= 10` gate before assigning RAPIDLY_DEGRADING trend label.
+
+#### Session 20 Log Entry
+| 2026-03-22 | 20 | Comprehensive app diagnosis (Playwright QA + backend tests + network). Fixed 5 bugs: cascade banner persistence (HIGH), prognostics double-subtraction (MED), speed schema cap, nameplate mismatch, rapidly-degrading fresh-load gate. |
 
 ---
 

@@ -7,16 +7,40 @@
 
 ## Open
 
-### 🔧 ISSUE-031: BUG-NEW-3 Partially addressed — prognostics "Rapidly Degrading" label
-- **Found**: Session 19 Playwright QA (2026-03-22)
-- **Severity**: Low — cosmetic issue, not misleading in active fault context
-- **Description**: "Rapidly Degrading" trend label appears briefly after page refresh when history has only 2 data points. A 2-point regression with any downward slope produces a large rate if the health ticked down by even 0.1 pt.
-- **Impact**: Clears after a few seconds as more history accumulates.
-- **Resolution**: Could add a minimum confidence gate (e.g., require ≥5 points before showing RAPIDLY_DEGRADING). Low priority.
+### 🔧 ISSUE-008: SQLite snapshot query uses bare-column behaviour (SQLite-specific)
+*(moved below — was previously under "Open from before Session 19")*
 
 ---
 
 ## Resolved
+
+### ✅ ISSUE-042: Frontend nameplate mismatch vs backend config (Session 20)
+- **Found**: Session 20 comprehensive diagnosis (2026-03-22)
+- **Resolution**: `AssetKPIBar.tsx` updated — Siemens AG→GE Vernova, 220/33kV→230/69kV, S/N GEV-2005-0847, in service since 2005. Matches `config.py` TRANSFORMER_* constants exactly.
+
+### ✅ ISSUE-041: WSSetSpeedSchema le=60 cap too low (Session 20)
+- **Found**: Session 20 comprehensive diagnosis (2026-03-22)
+- **Description**: WebSocket `set_speed` message schema validated `speed_multiplier` with `le=60` — rejected values 61–200 that the REST API and UI both support.
+- **Resolution**: `WSSetSpeedSchema` changed to `le=200` in `schemas.py`; error message in `websocket_handler.py` updated to "1–200".
+
+### ✅ ISSUE-040: Prognostics intervention projection double-counts warmup degradation (Session 20)
+- **Found**: Session 20 comprehensive diagnosis (2026-03-22)
+- **Description**: `project_intervention()` computed `score_after_warmup = current_score + slope * warmup * 3600`, then computed `score_after_intervention = score_after_warmup - rate_per_hr * warmup + intervention_rate_per_hr * remaining`. The `- rate_per_hr * warmup` term double-subtracted degradation already in `score_after_warmup`.
+- **Resolution**: Removed the erroneous double-subtraction term. Formula is now `score_after_warmup + intervention_rate_per_hr * remaining`.
+
+### ✅ ISSUE-039: Cascade failure banner persists indefinitely after returning to Normal (Session 20)
+- **Found**: Session 20 comprehensive diagnosis (2026-03-22)
+- **Severity**: High — EMERGENCY banner and cascade UI state stuck until backend process restart
+- **Description**: Two root causes: (1) When `scenario_id` transitions to "normal", `_emit_scenario_update()` stops being called (guarded by `if scenario_id != "normal"`), so the frontend never receives `cascade_triggered=False`. (2) `_cascade_triggered` backend flag only cleared when `_winding_critical_duration` decayed below 300s — at 1× speed this takes ~10 real minutes.
+- **Resolution**: Added `else` clause on scenario-transition detection in `engine.py` to immediately reset `_cascade_triggered` and `_winding_critical_duration` and emit a final `scenario_update` with `cascade_triggered=False`. Added defensive `cascadeNow = scenario_id === 'normal' ? false : rawCascade` in `useWebSocket.ts`.
+
+### ✅ ISSUE-031: BUG-NEW-3 Prognostics "Rapidly Degrading" label on fresh load (Session 20)
+- **Found**: Session 19 Playwright QA (2026-03-22); fixed in Session 20
+- **Severity**: Low — cosmetic, clears after a few seconds
+- **Description**: With only 2 health history points after page refresh, a 0.1 pt health dip produces a massive apparent degradation rate (pts/hr), triggering RAPIDLY_DEGRADING and CRITICAL urgency briefly.
+- **Resolution**: Added `n >= 10` gate in `prognostics.py` trend classification — RAPIDLY_DEGRADING requires at least 10 history points.
+
+## Resolved (pre-Session 20)
 
 ### ✅ ISSUE-037: BUG-NEW-7 Projected health scores showed "1" (Session 19)
 - **Found**: Session 19 Playwright QA (2026-03-22)
