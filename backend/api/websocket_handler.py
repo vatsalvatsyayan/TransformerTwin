@@ -201,7 +201,7 @@ async def _handle_client_message(websocket: WebSocket, raw: str) -> None:
                 logger.info("Speed set to %dx via WebSocket", multiplier)
             except (ValueError, TypeError):
                 error = WSErrorSchema(
-                    code="INVALID_MESSAGE", message="speed_multiplier must be an integer 1–60."
+                    code="INVALID_MESSAGE", message="speed_multiplier must be an integer 1–200."
                 )
                 await manager.send_personal(websocket, error.model_dump())
 

@@ -109,11 +109,11 @@ export const AssetKPIBar = memo(function AssetKPIBar() {
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-xs font-bold text-white font-mono">TRF-001</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 font-bold font-mono uppercase tracking-wide">100 MVA</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">220 / 33 kV</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">230 / 69 kV</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">ONAN/ONAF/OFAF</span>
         </div>
         <div className="text-[9px] text-slate-600 leading-tight">
-          Siemens AG · Bay 3 Substation · S/N: SEM-2009-0847 · In service since 2009
+          GE Vernova · Substation Alpha, Bay 3 · S/N: GEV-2005-0847 · In service since 2005
         </div>
       </div>
 

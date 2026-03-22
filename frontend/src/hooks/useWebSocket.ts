@@ -119,7 +119,10 @@ export function useWebSocket(): void {
         }
 
         case 'scenario_update': {
-          const cascadeNow = (msg as { cascade_triggered?: boolean }).cascade_triggered ?? false
+          // If scenario is back to normal, cascade is definitionally inactive —
+          // guard against a stale cascade_triggered=true from the final transition tick.
+          const rawCascade = (msg as { cascade_triggered?: boolean }).cascade_triggered ?? false
+          const cascadeNow = msg.scenario_id === 'normal' ? false : rawCascade
           updateScenario({
             scenario_id: msg.scenario_id,
             name: msg.name,

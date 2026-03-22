@@ -486,7 +486,7 @@ class WSPongSchema(BaseModel):
 
 class WSSetSpeedSchema(BaseModel):
     type: Literal["set_speed"] = "set_speed"
-    speed_multiplier: int = Field(ge=1, le=60)
+    speed_multiplier: int = Field(ge=1, le=200)
 
 
 class WSTriggerScenarioSchema(BaseModel):

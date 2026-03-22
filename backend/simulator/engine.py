@@ -591,6 +591,15 @@ class SimulatorEngine:
         if current_scenario_id != self._last_scenario_id:
             if current_scenario_id != "normal":
                 await self._emit_scenario_start_alert(current_scenario_id, now_iso)
+            else:
+                # Scenario transitioned back to normal — immediately clear cascade so
+                # the frontend banner and risk escalation are removed without waiting
+                # for the _winding_critical_duration decay timer (~10 real minutes).
+                self._cascade_triggered = False
+                self._winding_critical_duration = 0.0
+                # Emit one final scenario_update so the frontend receives
+                # cascade_triggered=False and clears the cascade UI state.
+                await self._emit_scenario_update(now_iso)
             self._last_scenario_id = current_scenario_id
 
         thermal_due = self.sim_time - self._last_thermal_emit >= THERMAL_UPDATE_INTERVAL_SIM_S

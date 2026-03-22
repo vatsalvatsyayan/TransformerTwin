@@ -157,10 +157,12 @@ class PrognosticsEngine:
             # No-action trajectory for first 0.5h (action takes time to take effect)
             warmup = min(hours, 0.5)
             remaining = max(0.0, hours - 0.5)
+            # Warmup: continues degrading at natural rate
             score_after_warmup = current_score + slope_per_s * warmup * 3600.0
-            score_after_intervention = score_after_warmup + (
-                -rate_per_hr * warmup + intervention_rate_per_hr * remaining
-            )
+            # After intervention: health recovers at intervention_rate_per_hr.
+            # Note: score_after_warmup already accounts for warmup degradation;
+            # only add the recovery for the remaining post-intervention period.
+            score_after_intervention = score_after_warmup + intervention_rate_per_hr * remaining
             return max(0.0, min(100.0, round(score_after_intervention, 1)))
 
         # --- Intervention time-to-critical ---
@@ -174,7 +176,10 @@ class PrognosticsEngine:
                 intervention_time_to_critical = max(0.0, hrs)
 
         # --- Trend classification ---
-        if rate_per_hr > 3.0:
+        # Require at least 10 history points before declaring RAPIDLY_DEGRADING to
+        # prevent the 2-point fresh-load case (a single 0.1-pt dip) from producing
+        # a large apparent rate and triggering a misleading urgent label on startup.
+        if rate_per_hr > 3.0 and n >= 10:
             trend = "RAPIDLY_DEGRADING"
             trend_label = "Rapidly Degrading"
         elif rate_per_hr > 0.5:
