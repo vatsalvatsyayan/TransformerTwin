@@ -93,12 +93,19 @@ def _score_fm_001(state: TransformerState, dga: dict) -> tuple[float, list[dict]
         (match_score, evidence_list) tuple.
     """
     duval_zone = dga.get("duval", {}).get("zone", "NONE") if dga else "NONE"
-    expected = state.winding_temp  # fallback: use actual as expected
-    # Expected winding temp from anomaly data if present (not stored in state)
-    dev_pct = 0.0  # will be populated if anomaly data included
+
+    # Use expected_winding_temp from IEC 60076-7 physics model (populated by engine).
+    # This enables early FM-001 detection when winding exceeds the model prediction
+    # even before absolute caution thresholds (90°C) are reached — e.g. a hot_spot
+    # scenario at Stage 2 with winding 75°C vs. model 35°C (114% deviation).
+    expected_winding = getattr(state, "expected_winding_temp", 0.0)
+    if expected_winding > 5.0 and state.winding_temp > expected_winding:
+        dev_pct = (state.winding_temp - expected_winding) / max(expected_winding, 1.0) * 100.0
+    else:
+        dev_pct = 0.0
 
     e1 = _threshold_score(state.winding_temp, 90.0, 105.0, 120.0)
-    e2 = min(1.0, dev_pct / 20.0)  # deviation from expected (0 until anomaly wires in)
+    e2 = min(1.0, dev_pct / 100.0)  # 100% above physics model = full score; 50% = 0.5
     e3 = _threshold_score(state.dga_c2h4, 50.0, 200.0, 600.0)
     e4 = _threshold_score(state.dga_ch4, 75.0, 200.0, 600.0)
     e5 = 1.0 if duval_zone in {"T1", "T2", "T3"} else 0.0
@@ -109,7 +116,7 @@ def _score_fm_001(state: TransformerState, dga: dict) -> tuple[float, list[dict]
 
     evidence = [
         {"condition": f"Winding temperature {state.winding_temp:.1f}°C (caution 90°C)", "matched": e1 > 0, "value": f"{state.winding_temp:.1f}°C"},
-        {"condition": "Winding above expected (anomaly deviation)", "matched": e2 > 0, "value": f"{dev_pct:.1f}%"},
+        {"condition": f"Winding {dev_pct:.0f}% above physics model ({expected_winding:.1f}°C expected)", "matched": e2 > 0, "value": f"{dev_pct:.1f}%"},
         {"condition": f"Ethylene elevated {state.dga_c2h4:.1f}ppm (caution 50ppm)", "matched": e3 > 0, "value": f"{state.dga_c2h4:.1f}ppm"},
         {"condition": f"Methane elevated {state.dga_ch4:.1f}ppm (caution 75ppm)", "matched": e4 > 0, "value": f"{state.dga_ch4:.1f}ppm"},
         {"condition": f"Duval zone is thermal (current: {duval_zone})", "matched": e5 > 0, "value": duval_zone},

@@ -56,6 +56,9 @@ function ProjectionBars({ prog }: { prog: PrognosticsResponse }) {
         {horizons.map((h) => {
           const noActionScore = noAction[h]
           const interventionScore = intervention[h]
+          // Clamp to [0,100] integer — prevents showing "1" for near-zero projections
+          // that result from linear extrapolation during steep degradation transients.
+          const fmt = (s: number | null) => s !== null ? Math.max(0, Math.min(100, Math.round(s))).toString() : '?'
           return (
             <div key={h} className="rounded bg-[#1a1d27] border border-[#2d3148] p-2">
               <p className="text-[9px] text-slate-600 text-center mb-2 font-medium">+{h}</p>
@@ -64,7 +67,7 @@ function ProjectionBars({ prog }: { prog: PrognosticsResponse }) {
                 <div className="flex justify-between items-center mb-0.5">
                   <span className="text-[8px] text-slate-600">No action</span>
                   <span className={`text-[9px] font-mono font-bold ${scoreColor(noActionScore)}`}>
-                    {noActionScore !== null ? noActionScore.toFixed(0) : '?'}
+                    {fmt(noActionScore)}
                   </span>
                 </div>
                 <div className="h-1 bg-[#2d3148] rounded-full overflow-hidden">
@@ -84,7 +87,7 @@ function ProjectionBars({ prog }: { prog: PrognosticsResponse }) {
                 <div className="flex justify-between items-center mb-0.5">
                   <span className="text-[8px] text-emerald-600">70% load</span>
                   <span className={`text-[9px] font-mono font-bold ${scoreColor(interventionScore)}`}>
-                    {interventionScore !== null ? interventionScore.toFixed(0) : '?'}
+                    {fmt(interventionScore)}
                   </span>
                 </div>
                 <div className="h-1 bg-[#2d3148] rounded-full overflow-hidden">

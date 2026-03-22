@@ -460,11 +460,14 @@ class SimulatorEngine:
         cooling_override: str | None = thermal_mods.get("cooling_mode_override", None)
 
         # --- 3. Load + ambient profiles ---
-        # Operator load override takes precedence over the normal sinusoidal profile.
+        # Operator load override acts as a CAP on the natural load profile, not a fixed value.
+        # This means "70% Load" will reduce load when the profile is above 70%, but will NOT
+        # artificially increase load when the natural profile is already below 70%.
+        natural_load = get_load_fraction(self.sim_time)
         if self.operator_load_override is not None:
-            load_fraction = self.operator_load_override
+            load_fraction = min(self.operator_load_override, natural_load)
         else:
-            load_fraction = get_load_fraction(self.sim_time)
+            load_fraction = natural_load
         ambient_temp = get_ambient_temp(self.sim_time)
 
         # --- 4. Equipment model (derives cooling mode) ---
@@ -775,9 +778,9 @@ class SimulatorEngine:
         trend = anomaly.get("trend", "STABLE")
         trend_text = " Trend: rising rapidly." if trend == "RISING" else ""
 
-        title = f"{sensor_name} — {status} Level Reached"
+        title = f"{sensor_name} — Anomaly Detected"
         description = (
-            f"{sensor_name} has reached {status} level. "
+            f"{sensor_name} deviates from baseline ({status}). "
             f"Current: {actual:.1f}{unit} (expected ≈ {expected:.1f}{unit}). "
             f"Deviation: {deviation_pct:.1f}%.{trend_text}"
         )

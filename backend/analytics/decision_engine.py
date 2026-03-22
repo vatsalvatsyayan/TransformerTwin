@@ -430,6 +430,7 @@ class DecisionEngine:
         health_result: dict,
         fmea_results: list[dict],
         anomalies: list[dict],
+        cascade_triggered: bool = False,
     ) -> dict:
         """Produce a complete decision support snapshot.
 
@@ -438,6 +439,8 @@ class DecisionEngine:
             health_result: Latest health score result from HealthScoreCalculator.
             fmea_results: Latest FMEA results from FMEAEngine.
             anomalies: Latest anomalies from AnomalyDetector.
+            cascade_triggered: True if thermal→arcing cascade is active. Forces
+                risk level to at least HIGH regardless of health score calculation.
 
         Returns:
             Decision support dict matching DecisionResponse schema.
@@ -447,6 +450,12 @@ class DecisionEngine:
         # Risk assessment
         risk_score = _compute_risk_score(health_score, fmea_results, anomalies)
         risk_level = _risk_level_label(risk_score)
+
+        # Cascade override: an active thermal→arcing cascade is always HIGH risk
+        # regardless of health score (health lags the physical fault by many minutes).
+        if cascade_triggered and risk_level in ("NOMINAL", "LOW", "MEDIUM"):
+            risk_level = "HIGH"
+            risk_score = max(risk_score, DECISION_RISK_HIGH)
 
         # Remaining useful life
         rul_hours = _estimate_rul_hours(health_score, risk_score, state, fmea_results)
@@ -474,7 +483,9 @@ class DecisionEngine:
                     active_runbooks.append(runbook)
 
         # Risk description
-        if risk_level == "CRITICAL":
+        if cascade_triggered and risk_level in ("HIGH", "CRITICAL"):
+            risk_description = "Thermal→arcing cascade active — sustained critical winding temperature has escalated to DGA fault"
+        elif risk_level == "CRITICAL":
             risk_description = "Active fault with high probability of imminent failure"
         elif risk_level == "HIGH":
             risk_description = "Probable failure mode detected — maintenance required urgently"

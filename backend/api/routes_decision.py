@@ -60,12 +60,14 @@ async def get_decision(request: Request) -> dict:
     health_result = getattr(simulator, "latest_health_result", {"overall_score": 100.0})
     fmea_results = getattr(simulator, "latest_fmea_result", [])
     anomalies = getattr(simulator, "latest_anomalies", [])
+    cascade_triggered = getattr(simulator, "_cascade_triggered", False)
 
     result = _decision_engine.compute(
         state=state,
         health_result=health_result,
         fmea_results=fmea_results,
         anomalies=anomalies,
+        cascade_triggered=cascade_triggered,
     )
     result["timestamp"] = now
     return result

@@ -279,7 +279,9 @@ VALID_FAILURE_MODE_IDS: tuple[str, ...] = (
 # FMEA confidence thresholds (Integration Contract Section 1.8)
 FMEA_CONFIDENCE_POSSIBLE: float = 0.4   # 0.4–0.7 → "Possible"
 FMEA_CONFIDENCE_PROBABLE: float = 0.7   # > 0.7 → "Probable"
-FMEA_MIN_REPORT_SCORE: float = 0.3      # Only report modes above this threshold
+FMEA_MIN_REPORT_SCORE: float = 0.25     # Only report modes above this threshold
+# Lowered from 0.3 to 0.25 so early-stage scenarios (e.g. hot_spot Stage 2 with
+# winding at 75°C) appear in FMEA as "Monitoring" before reaching caution threshold.
 
 # ---------------------------------------------------------------------------
 # Anomaly detection

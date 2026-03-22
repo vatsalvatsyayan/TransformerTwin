@@ -42,6 +42,16 @@ _RATE_OF_CHANGE_THRESHOLD_PCT: float = 0.10
 # Minimum samples before z-score baseline is considered valid
 _MIN_BASELINE_SAMPLES: int = 20
 
+# Minimum absolute deviation before any anomaly alert fires for thermal sensors.
+# Without this floor, sub-degree natural fluctuations can produce large z-scores
+# when sensor noise is very small, generating dozens of spurious CAUTION alerts.
+# Value chosen as 2°C — smaller than any operationally meaningful temperature change.
+_MIN_ABS_DEVIATION: dict[str, float] = {
+    "TOP_OIL_TEMP": 2.0,   # °C — sub-2°C changes are measurement noise
+    "BOT_OIL_TEMP": 2.0,   # °C
+    "WINDING_TEMP": 2.0,   # °C
+}
+
 
 def _sensor_range(sensor_id: str) -> float:
     """Return the useful range (warning - caution) for rate-of-change scaling.
@@ -213,6 +223,13 @@ class AnomalyDetector:
 
         values = list(hist)
         mean = sum(values) / len(values)
+
+        # Absolute deviation floor: suppress alerts for tiny natural fluctuations.
+        # A ±0.6°C wiggle at high z-score is not operationally meaningful.
+        min_abs_dev = _MIN_ABS_DEVIATION.get(sensor_id, 0.0)
+        if min_abs_dev > 0.0 and abs(value - mean) < min_abs_dev:
+            self._last_status[sensor_id] = "NORMAL"
+            return None
         variance = sum((v - mean) ** 2 for v in values) / len(values)
         # Floor std at 1% of sensor range to prevent tiny natural noise
         # from generating huge z-scores and false CAUTION alerts.
