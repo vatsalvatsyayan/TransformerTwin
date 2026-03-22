@@ -7,6 +7,45 @@
 
 ## Open
 
+### 🔧 ISSUE-031: BUG-NEW-3 Partially addressed — prognostics "Rapidly Degrading" label
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Severity**: Low — cosmetic issue, not misleading in active fault context
+- **Description**: "Rapidly Degrading" trend label appears briefly after page refresh when history has only 2 data points. A 2-point regression with any downward slope produces a large rate if the health ticked down by even 0.1 pt.
+- **Impact**: Clears after a few seconds as more history accumulates.
+- **Resolution**: Could add a minimum confidence gate (e.g., require ≥5 points before showing RAPIDLY_DEGRADING). Low priority.
+
+---
+
+## Resolved
+
+### ✅ ISSUE-037: BUG-NEW-7 Projected health scores showed "1" (Session 19)
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Resolution**: `ProjectionBars` in `PrognosticsWidget.tsx` changed from `.toFixed(0)` to `Math.max(0, Math.min(100, Math.round(score)))` — prevents 0.5 rounding up to "1".
+
+### ✅ ISSUE-036: BUG-NEW-6 Decision engine showed NOMINAL during cascade (Session 19)
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Resolution**: `DecisionEngine.compute()` accepts `cascade_triggered: bool`. When True, forces risk ≥ HIGH. `routes_decision.py` passes `simulator._cascade_triggered`. (ADR-028)
+
+### ✅ ISSUE-035: BUG-NEW-5 FMEA silent during Stage 2 hot spot at 75°C (Session 19)
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Resolution**: FM-001 now computes evidence e2 from `state.expected_winding_temp` (IEC physics model). `FMEA_MIN_REPORT_SCORE` lowered 0.30→0.25. Hot spot at 75°C vs 35°C model now scores 0.25 = Monitoring. (ADR-029)
+
+### ✅ ISSUE-034: BUG-NEW-4 "70% Load" raised load when natural load < 70% (Session 19)
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Resolution**: Engine now applies `min(operator_load_override, natural_load)` — override is a ceiling, not a set. (ADR-027)
+
+### ✅ ISSUE-033: BUG-NEW-2 Anomaly alert titles said "CAUTION Level Reached" (Session 19)
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Resolution**: Changed to "Anomaly Detected". Description updated from "has reached {status} level" to "deviates from baseline ({status})".
+
+### ✅ ISSUE-032: BUG-NEW-1 Anomaly alert flood at 30× speed (Session 19)
+- **Found**: Session 19 Playwright QA (2026-03-22)
+- **Resolution**: Added `_MIN_ABS_DEVIATION` floor in `anomaly_detector.py`. Thermal sensors require ≥2°C absolute deviation before any alert fires. (ADR-026)
+
+---
+
+## Open (from before Session 19)
+
 ### 🔧 ISSUE-008: SQLite snapshot query uses bare-column behaviour (SQLite-specific)
 - **Found**: Phase 4.6 backend (2026-03-21)
 - **Severity**: Low

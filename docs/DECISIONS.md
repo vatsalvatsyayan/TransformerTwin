@@ -5,6 +5,36 @@
 
 ---
 
+## ADR-026: Anomaly absolute deviation floor for thermal sensors (Session 19)
+- **Date**: 2026-03-22
+- **Context**: Rolling z-score alerts were firing for sub-degree temperature fluctuations. A 0.6°C drift with very low natural noise can produce z > 3.0 and trigger CAUTION. This generated 82+ alerts in 8 min at 30× speed — alert fatigue kills demo value.
+- **Decision**: Add `_MIN_ABS_DEVIATION` dict in `anomaly_detector.py`. Thermal sensors require ≥2°C absolute deviation from rolling mean before any alert fires, regardless of z-score.
+- **Rationale**: A 0.6°C drift is not operationally meaningful even if statistically unusual. The 2°C floor is below any actionable temperature change but above normal sensor noise.
+- **Trade-off**: Could miss very slow, tiny drifts. Acceptable — absolute threshold alerts (CAUTION/WARNING) will still catch these before the z-score would be meaningful.
+
+## ADR-027: Operator load override as cap, not fixed set (Session 19)
+- **Date**: 2026-03-22
+- **Context**: "70% Load" operator override was implemented as `load_fraction = 0.70` (fixed). If natural load was 42%, clicking "70% Load" raised load to 70%, increasing thermal stress — the opposite of the intended protective action.
+- **Decision**: Change to `load_fraction = min(operator_load_override, natural_load)`. The override is now a ceiling on the natural load profile, not a forced fixed value.
+- **Rationale**: Semantically correct — "reduce load to 70%" means "don't let load exceed 70%", not "force load to exactly 70%". This matches the status message "Load capped at 70%".
+- **Trade-off**: None — purely corrects wrong behavior.
+
+## ADR-028: Decision engine receives cascade flag to override risk score (Session 19)
+- **Date**: 2026-03-22
+- **Context**: During an active thermal→arcing cascade, the decision engine showed "NOMINAL" risk because health was still at 100 (health lags the physical fault by many simulation minutes).
+- **Decision**: Add `cascade_triggered: bool = False` to `DecisionEngine.compute()`. When True, force risk level to at least HIGH. Pass this flag from `simulator._cascade_triggered` in `routes_decision.py`.
+- **Rationale**: Cascade is an unambiguous HIGH-risk event that cannot be safely ignored. Health score is a lagging indicator; cascade is a leading one. The decision layer must account for both.
+- **Trade-off**: Using private `_cascade_triggered` attr (not a public property). Acceptable for this codebase size; could be formalized as a public property later.
+
+## ADR-029: FMEA FM-001 uses IEC physics model deviation for early detection (Session 19)
+- **Date**: 2026-03-22
+- **Context**: FMEA was silent during Stage 2 hot_spot (winding 75°C) because FM-001's first evidence condition only scores above 0 when winding_temp ≥ 90°C (caution threshold). Hot spots developing below the caution temperature were completely invisible.
+- **Decision**: Compute `dev_pct` in `_score_fm_001` from `state.expected_winding_temp` (IEC 60076-7 physics model). A winding at 75°C when the model predicts 35°C is 114% above expectation → evidence score e2=1.0 → total FM-001 ≈ 0.25 (Monitoring level). Also lowered `FMEA_MIN_REPORT_SCORE` from 0.30 to 0.25.
+- **Rationale**: The digital twin paradigm is "actual vs. model". FM-001 should flag winding hot spots based on deviation from the physics model, not only on absolute temperature. This is the correct engineering approach — a 75°C winding in winter with a 35°C model prediction is more alarming than an 88°C winding in summer with a 85°C model prediction.
+- **Trade-off**: May surface FM-001 "Monitoring" during normal summer peaks when winding is slightly above model due to ambient effects. Acceptable since "Monitoring" level requires no action.
+
+---
+
 ## ADR-001: Python FastAPI for Backend
 - **Date**: Pre-implementation
 - **Context**: Needed real-time WebSocket streaming with numerical computation for sensor simulation and anomaly detection.

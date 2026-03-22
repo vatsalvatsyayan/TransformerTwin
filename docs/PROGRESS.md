@@ -1,7 +1,49 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-22 (Session 18 — Comprehensive QA analysis + 8 bug fixes from analysis.md)
+> Last updated: 2026-03-22 (Session 19 — Full Playwright QA + 6 targeted bug fixes from new analysis.md)
+
+---
+
+## Current Status: 🟢 Session 19 Complete — Full QA + 6 Bug Fixes
+
+### Session 19 Additions (2026-03-22)
+
+**Context**: Ran full Playwright QA across all 14 feature areas (cleared screenshots folder, took fresh screenshots). Wrote comprehensive new `docs/analysis.md` with 7 bugs found (BUG-NEW-1→7). Implemented 6 fixes covering the most impactful issues.
+
+#### FIX-1: Anomaly alert absolute deviation floor (`anomaly_detector.py`)
+- Added `_MIN_ABS_DEVIATION` dict: thermal sensors require ≥2°C absolute deviation before any alert fires.
+- Eliminates spurious CAUTION alerts for sub-degree fluctuations that produce high z-scores due to very low natural noise.
+
+#### FIX-2: Anomaly alert title clearer (`engine.py`)
+- Changed from `"{sensor} — {STATUS} Level Reached"` to `"{sensor} — Anomaly Detected"`.
+- The old title was misleading — z-score anomalies are pattern deviations, not absolute threshold crossings.
+- Also updated description to say "deviates from baseline" instead of "has reached {status} level".
+
+#### FIX-3/3b: Decision engine cascade-aware risk (`decision_engine.py`, `routes_decision.py`)
+- Added `cascade_triggered: bool = False` parameter to `DecisionEngine.compute()`.
+- When True, forces risk level to at least "HIGH" regardless of health score calculation.
+- Health lags the physical fault by many minutes; cascade is an immediate HIGH risk signal.
+- `routes_decision.py` now reads `simulator._cascade_triggered` and passes it through.
+
+#### FIX-4: 70% Load override is a cap, not a fixed set (`engine.py`)
+- Changed load application from `load_fraction = operator_load_override` to `min(operator_load_override, natural_load)`.
+- Previously, clicking "70% Load" when load was 42% would raise load to 70%, increasing thermal stress.
+- Now it correctly caps the natural profile at 70% without raising load below that level.
+
+#### FIX-5: FMEA detects early hot spot via physics model deviation (`config.py`, `fmea_engine.py`)
+- Lowered `FMEA_MIN_REPORT_SCORE` from 0.30 to 0.25.
+- Updated `_score_fm_001` to compute `dev_pct` from `state.expected_winding_temp` (IEC physics model).
+- A winding at 75°C when model predicts 35°C is 114% above model → e2=1.0 → match_score≈0.25 → appears as "Monitoring".
+- This surfaces FM-001 during Stage 2 hot_spot before absolute caution threshold (90°C) is reached.
+
+#### FIX-6: Projected health scores display fix (`PrognosticsWidget.tsx`)
+- Changed `score.toFixed(0)` to `Math.max(0, Math.min(100, Math.round(score)))` in `ProjectionBars`.
+- Prevents displaying "1" (from `(0.5).toFixed(0) = "1"`) when projected score is near zero.
+- Shows "0" for projected scores below 0.5 instead of the misleading "1".
+
+#### Session 19 Log Entry
+| 2026-03-22 | 19 | Full Playwright QA (all 14 areas) → new analysis.md with 7 bugs. Implemented 6 fixes: anomaly abs-dev floor, alert title clarity, cascade→decision risk, 70%-Load as cap, FMEA early detection via physics model, projected score display fix. |
 
 ---
 
