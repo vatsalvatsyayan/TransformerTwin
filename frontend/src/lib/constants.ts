@@ -9,6 +9,8 @@ export interface SensorMeta {
   caution: number
   warning: number
   critical: number
+  /** If true, lower values are worse (e.g. dielectric strength). LimitBar inverts direction. */
+  invertedScale?: boolean
 }
 
 export const SENSOR_META: Partial<Record<SensorId, SensorMeta>> = {
@@ -25,11 +27,14 @@ export const SENSOR_META: Partial<Record<SensorId, SensorMeta>> = {
   DGA_CO:         { label: 'Carbon Monoxide (CO)', unit: 'ppm',     group: 'dga',        caution: 350, warning: 900, critical: 1800 },
   DGA_CO2:        { label: 'Carbon Dioxide (CO₂)', unit: 'ppm',    group: 'dga',        caution: 2500, warning: 4000, critical: 9000 },
   OIL_MOISTURE:   { label: 'Oil Moisture',        unit: 'ppm',      group: 'diagnostic', caution: 15,  warning: 25,  critical: 35 },
-  OIL_DIELECTRIC: { label: 'Oil Dielectric',      unit: 'kV',       group: 'diagnostic', caution: 45,  warning: 40,  critical: 30 },
+  OIL_DIELECTRIC: { label: 'Oil Dielectric',      unit: 'kV',       group: 'diagnostic', caution: 45,  warning: 40,  critical: 30, invertedScale: true },
   BUSHING_CAP_HV: { label: 'HV Bushing Cap.',     unit: 'pF',       group: 'diagnostic', caution: 525, warning: 550, critical: 600 },
   BUSHING_CAP_LV: { label: 'LV Bushing Cap.',     unit: 'pF',       group: 'diagnostic', caution: 440, warning: 462, critical: 504 },
   TAP_POSITION:   { label: 'Tap Position',        unit: 'position', group: 'equipment',  caution: 28,  warning: 31,  critical: 33 },
   TAP_OP_COUNT:   { label: 'Tap Op. Count',       unit: 'count',    group: 'equipment',  caution: 50000, warning: 80000, critical: 100000 },
+  FAN_BANK_1:     { label: 'Fan Bank 1',          unit: '',         group: 'equipment',  caution: 1, warning: 1, critical: 1 },
+  FAN_BANK_2:     { label: 'Fan Bank 2',          unit: '',         group: 'equipment',  caution: 1, warning: 1, critical: 1 },
+  OIL_PUMP_1:     { label: 'Oil Pump 1',          unit: '',         group: 'equipment',  caution: 1, warning: 1, critical: 1 },
 }
 
 /** Status color map matching design system */

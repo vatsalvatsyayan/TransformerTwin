@@ -81,7 +81,7 @@ function EnvelopeTooltip({ active, payload }: { active?: boolean; payload?: { pa
         <div className={`mt-1 pt-1 border-t border-[#3d4268] font-mono text-[10px] ${
           d.deviation > 10 ? 'text-red-400' : d.deviation > 5 ? 'text-orange-400' : 'text-yellow-400'
         }`}>
-          Deviation: {d.deviation > 0 ? '+' : ''}{d.deviation.toFixed(1)}°C above model
+          Deviation: {d.deviation > 0 ? '+' : ''}{d.deviation.toFixed(1)}°C {d.deviation >= 0 ? 'above' : 'below'} model
         </div>
       )}
     </div>
@@ -198,7 +198,7 @@ export const OperatingEnvelopeChart = memo(function OperatingEnvelopeChart() {
             <div className={`text-[10px] font-semibold mt-0.5 ${
               currentDeviation >= 10 ? 'text-red-400' : currentDeviation >= 5 ? 'text-orange-400' : 'text-yellow-400'
             }`}>
-              {currentDeviation > 0 ? '+' : ''}{currentDeviation.toFixed(1)}°C above IEC 60076-7 model
+              {currentDeviation > 0 ? '+' : ''}{currentDeviation.toFixed(1)}°C {currentDeviation >= 0 ? 'above' : 'below'} IEC 60076-7 model
               {hasFault && ' — fault scenario active'}
             </div>
           )}

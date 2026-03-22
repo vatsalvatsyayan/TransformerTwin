@@ -45,7 +45,10 @@ function TrendArrow({ trend, status }: { trend: Trend; status: string }) {
 function LimitBar({ value, sensorId, status }: { value: number; sensorId: SensorId; status: string }) {
   const meta = SENSOR_META[sensorId]
   if (!meta) return null
-  const pct = Math.min(1, Math.max(0, value / meta.critical))
+  // For inverted sensors (e.g. dielectric strength), lower value = more dangerous
+  const pct = meta.invertedScale
+    ? Math.min(1, Math.max(0, 1 - (value - meta.critical) / (meta.caution - meta.critical)))
+    : Math.min(1, Math.max(0, value / meta.critical))
   const barColor =
     status === 'CRITICAL' ? 'bg-red-500'
     : status === 'WARNING'  ? 'bg-orange-500'
@@ -112,11 +115,12 @@ export const SensorRow = memo(function SensorRow({ sensorId }: SensorRowProps) {
   const trend = isOnOff ? 'stable' : computeTrend(points.map((p) => p.value))
 
   // Physics-based model prediction (only for thermal sensors with IEC 60076-7 model)
+  // Use != null to guard against both undefined AND null (backend sends null until model warms up)
   const expected = reading?.expected
   const hasModelDev = (
     THERMAL_MODEL_SENSORS.has(sensorId) &&
-    expected !== undefined &&
-    latestValue !== undefined
+    expected != null &&
+    latestValue != null
   )
 
   return (

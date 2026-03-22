@@ -35,6 +35,30 @@
 - **Impact**: These sensors are cosmetically realistic but do not respond to fault scenarios.
 - **Resolution**: Implement slow degradation model in Phase 2 (low priority for demo).
 
+### 🐛 ISSUE-027: Anomaly alert flood during high-speed operation (Session 18 QA)
+- **Found**: Session 18 comprehensive QA (2026-03-21)
+- **Severity**: High — 160+ alerts in one session; alert fatigue in demo context
+- **Description**: Running at 100×–200× speed for >10 seconds causes rapid value shifts that the rolling Z-score detector interprets as anomalies. Values like "Top Oil 29°C (expected 31°C)" trigger WARNING alerts even though temps are within safe limits.
+- **Recommendation**: Add a cooldown period after speed changes before re-enabling anomaly detection, or apply adaptive min_std scaling proportional to speed multiplier.
+
+### 🐛 ISSUE-028: Alert recommended actions are direction-agnostic (Session 18 QA)
+- **Found**: Session 18 comprehensive QA (2026-03-21)
+- **Severity**: Medium — incorrect operator guidance for below-model deviations
+- **Description**: Alerts for sensors reading BELOW expected (e.g. "Top Oil 28°C, expected 31.4°C") still recommend "Check fans are running" and "Reduce load to 70%". These are overheating countermeasures, inappropriate for a below-model reading.
+- **Recommendation**: Direction-aware recommended actions based on deviation sign for thermal sensors.
+
+### 🐛 ISSUE-029: Snapshot API returns NORMAL status for boolean fan/pump sensors (Session 18 QA)
+- **Found**: Session 18 comprehensive QA (2026-03-21)
+- **Severity**: Low — only visible during historical playback
+- **Description**: `GET /api/sensors/snapshot` reads values from SQLite as REAL (float). The `isinstance(value, bool)` check in `_get_sensor_value_and_status` doesn't apply. Boolean sensors (FAN_BANK_1/2, OIL_PUMP_1) get `status: "NORMAL"` instead of `"ON"/"OFF"`. Frontend renders "0.0" instead of "OFF".
+- **Recommendation**: In snapshot route, use `SENSOR_DATA_TYPES` from `config.py` to map `type=="boolean"` sensors to ON/OFF status.
+
+### 🔧 ISSUE-030: Physics Correlation Y-axis fixed at 0–150°C (Session 18 QA)
+- **Found**: Session 18 comprehensive QA (2026-03-21)
+- **Severity**: Low — readability issue for normal-operation data
+- **Description**: Normal operation temps range 25–45°C but the chart shows 0–150°C, making data appear flat at the bottom.
+- **Recommendation**: Auto-scale Y-axis to data range ± 10% padding.
+
 ### ❓ ISSUE-004: Thermal model validation table discrepancy
 - **Found**: Phase 1.3c implementation (2026-03-21)
 - **Severity**: Low
