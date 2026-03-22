@@ -32,6 +32,18 @@ _SCENARIO_DESCRIPTIONS: dict[str, str] = {
         "Cooling fan bank failure causing progressive oil temperature rise. "
         "Develops over 1 simulated hour."
     ),
+    "partial_discharge": (
+        "Low-energy corona discharge in oil/paper insulation. "
+        "H₂ and CH₄ dominant DGA pattern; Duval PD zone. Develops over 2 simulated hours."
+    ),
+    "paper_degradation": (
+        "Accelerated cellulose insulation aging. "
+        "CO rises faster than CO₂; CO₂/CO ratio drops below 5. Develops over 3 simulated hours."
+    ),
+    "thermal_runaway": (
+        "6-stage cascading failure: cooling failure → hot spot → oil deterioration → "
+        "partial discharge → arcing → protection relay trip. Full cascade at 200× speed."
+    ),
 }
 
 
@@ -66,7 +78,7 @@ async def trigger_scenario(
         scenario_id=scenario_id,  # type: ignore[arg-type]
         name=scenario.name,
         status="TRIGGERED",
-        description=_SCENARIO_DESCRIPTIONS[scenario_id],
+        description=_SCENARIO_DESCRIPTIONS.get(scenario_id, "Scenario active."),
         started_at=now,
     )
 

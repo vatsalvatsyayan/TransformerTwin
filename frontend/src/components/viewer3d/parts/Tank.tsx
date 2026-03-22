@@ -12,15 +12,17 @@ interface EmissiveProps {
   emissiveIntensity: number
 }
 
-/** Maps an oil temperature value to an emissive glow for a tank slice. */
+/** Maps an oil temperature value to an emissive glow for a tank slice.
+ *  Thresholds calibrated so normal operating temps (≤70 °C) produce no visible glow.
+ *  Only genuinely elevated temps (fault conditions) light up.
+ */
 function tempToEmissive(tempC: number | undefined): EmissiveProps {
   if (tempC == null) return { emissive: '#000000', emissiveIntensity: 0 }
-  if (tempC >= 95)   return { emissive: '#dc2626', emissiveIntensity: 1.10 }  // CRITICAL red
-  if (tempC >= 85)   return { emissive: '#ea580c', emissiveIntensity: 0.75 }  // WARNING orange-red
-  if (tempC >= 75)   return { emissive: '#f97316', emissiveIntensity: 0.50 }  // CAUTION orange
-  if (tempC >= 65)   return { emissive: '#f59e0b', emissiveIntensity: 0.28 }  // warm amber
-  if (tempC >= 50)   return { emissive: '#ca8a04', emissiveIntensity: 0.12 }  // faint yellow
-  return { emissive: '#000000', emissiveIntensity: 0 }
+  if (tempC >= 100)  return { emissive: '#dc2626', emissiveIntensity: 1.10 }  // CRITICAL red (≥100°C)
+  if (tempC >= 90)   return { emissive: '#ea580c', emissiveIntensity: 0.75 }  // WARNING orange-red (≥90°C)
+  if (tempC >= 80)   return { emissive: '#f97316', emissiveIntensity: 0.40 }  // CAUTION orange (≥80°C)
+  if (tempC >= 70)   return { emissive: '#f59e0b', emissiveIntensity: 0.12 }  // barely warm amber (≥70°C)
+  return { emissive: '#000000', emissiveIntensity: 0 }                        // normal (< 70°C) — no glow
 }
 
 /** Linearly interpolate between two emissive props at fraction t (0=a, 1=b). */
@@ -102,6 +104,9 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
   const SLICE_COUNT = 5
   const sliceH = TANK_H / SLICE_COUNT // 0.56 each
 
+  // Terminal failure emissive — used by both slices and ribs
+  const shutdownEmissive: EmissiveProps = { emissive: '#dc2626', emissiveIntensity: 0.90 }
+
   const slices = Array.from({ length: SLICE_COUNT }, (_, i) => {
     const t = i / (SLICE_COUNT - 1)           // 0, 0.25, 0.5, 0.75, 1
     const yCenter = -TANK_H / 2 + sliceH * (i + 0.5) // evenly spaced centres
@@ -110,7 +115,6 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
     // Priority: selection highlight (1.8) > terminal failure red > thermal gradient.
     // Health status colors (CAUTION=0.35, WARNING=0.60, CRITICAL=0.90) do NOT override
     // thermal gradient — it already encodes the same information visually.
-    const shutdownEmissive: EmissiveProps = { emissive: '#dc2626', emissiveIntensity: 0.90 }
     const resolvedEmissive =
       healthEmissive.emissiveIntensity >= 1.5 ? healthEmissive
       : terminalFailure ? shutdownEmissive
@@ -142,8 +146,8 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
         height={0.06}
         width={2.08}
         depth={1.18}
-        emissive={topColor.emissive}
-        emissiveIntensity={topColor.emissiveIntensity}
+        emissive={terminalFailure ? shutdownEmissive.emissive : topColor.emissive}
+        emissiveIntensity={terminalFailure ? shutdownEmissive.emissiveIntensity : topColor.emissiveIntensity}
         color="#2e4758"
         metalness={0.6}
         roughness={0.4}
@@ -155,8 +159,8 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
         height={0.06}
         width={2.08}
         depth={1.18}
-        emissive={botColor.emissive}
-        emissiveIntensity={botColor.emissiveIntensity}
+        emissive={terminalFailure ? shutdownEmissive.emissive : botColor.emissive}
+        emissiveIntensity={terminalFailure ? shutdownEmissive.emissiveIntensity : botColor.emissiveIntensity}
         color="#2e4758"
         metalness={0.6}
         roughness={0.4}
@@ -166,7 +170,10 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
       {([-0.7, 0, 0.7] as const).map((y) => {
         const t = (y + 1.4) / 2.8 // normalize to [0,1]
         const ribColor = lerpEmissive(botColor, topColor, t)
-        const resolved = healthEmissive.emissiveIntensity >= 1.5 ? healthEmissive : ribColor
+        const resolved =
+          healthEmissive.emissiveIntensity >= 1.5 ? healthEmissive
+          : terminalFailure ? shutdownEmissive
+          : ribColor
         return (
           <TankSlice
             key={y}

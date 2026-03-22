@@ -1,7 +1,33 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-22 (Session 24 — Post-Thermal-Runaway UX: 6 Bug Fixes)
+> Last updated: 2026-03-22 (Session 25 — 4 Bug Fixes: Scenarios, Tank Color, State Reset, Fault Diagnosis)
+
+---
+
+## Current Status: 🟢 Session 25 Complete — 4 Bug Fixes: Scenarios, Tank Color, Page Reset, Fault Diagnosis Panel
+
+### Session 25 Additions (2026-03-22)
+
+**Goal**: Fix 4 bugs reported by user after Session 24.
+
+**Status**: COMPLETE. 28/28 backend tests pass. 125/125 frontend tests pass. TypeScript build clean.
+
+#### What was fixed:
+
+1. **Other scenarios broken (partial_discharge, paper_degradation, thermal_runaway)** — `routes_scenario.py` was crashing with `KeyError` because `_SCENARIO_DESCRIPTIONS` only had 4 entries (missing 3 scenarios). Added descriptions for all 7 scenarios and changed lookup to `.get(..., "Scenario active.")` as a safe fallback. All 7 scenarios now trigger correctly.
+
+2. **Tank color misleading at NORMAL status** — Temperature thresholds in `Tank.tsx` `tempToEmissive()` were too aggressive (amber at 65°C, orange at 75°C), causing the tank to glow orange-brown at normal operating temps. Raised thresholds: no glow below 70°C, barely-warm amber 70–80°C, CAUTION orange 80–90°C, WARNING 90–100°C, CRITICAL red ≥100°C. Also fixed ribs and flanges to apply terminal failure red override consistently (they previously skipped it).
+
+3. **Page refresh does not reset state** — On mount, `App.tsx` now calls `api.triggerScenario('normal')` + `api.executeOperatorAction('CLEAR_ALL')` so every page load starts from clean backend state. Backend scenario is reset to normal, operator overrides are cleared.
+
+4. **Component click should show problem + fix** — `PartDetailPanel.tsx` now includes a "Fault Diagnosis" section that filters FMEA active modes matching the clicked part's health component (`affected_components` cross-reference). Shows mode name, confidence badge (Probable/Possible/Monitoring with color coding), and top 2 recommended actions. Shows "No active fault modes detected" when health is NORMAL.
+
+#### Files changed:
+- `backend/api/routes_scenario.py` (Fix 1)
+- `frontend/src/components/viewer3d/parts/Tank.tsx` (Fix 2)
+- `frontend/src/App.tsx` (Fix 3)
+- `frontend/src/components/viewer3d/PartDetailPanel.tsx` (Fix 4)
 
 ---
 

@@ -9,7 +9,7 @@ import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore } from './store'
 import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA, fetchDecision, fetchOperatorStatus, fetchPrognostics } from './hooks/useApi'
-import { TerminalFailureOverlay } from './components/panels/TerminalFailureOverlay'
+import { api } from './lib/api'
 
 export default function App() {
   // Establish WebSocket connection (reconnects automatically)
@@ -17,10 +17,13 @@ export default function App() {
 
   const connectionStatus = useStore((s) => s.connectionStatus)
   const hasData = useStore((s) => Object.keys(s.readings).length > 0)
-  const terminalFailure = useStore((s) => s.terminalFailure)
 
   // Fetch initial REST data on mount — errors are logged but not fatal
   useEffect(() => {
+    // Reset backend to clean state on every page load (clears any active scenario / operator overrides)
+    api.triggerScenario('normal').catch((err: unknown) => console.warn('[Init] scenario reset failed:', err))
+    api.executeOperatorAction('CLEAR_ALL').catch((err: unknown) => console.warn('[Init] operator clear failed:', err))
+
     fetchCurrentSensors().catch((err: unknown) => console.warn('[Init] sensors fetch failed:', err))
     fetchHealth().catch((err: unknown) => console.warn('[Init] health fetch failed:', err))
     // Alerts are NOT pre-loaded from DB — each page refresh starts with a clean alert state.
@@ -71,7 +74,6 @@ export default function App() {
       )}
 
       <BottomTimeline />
-      {terminalFailure && <TerminalFailureOverlay />}
     </div>
   )
 }
