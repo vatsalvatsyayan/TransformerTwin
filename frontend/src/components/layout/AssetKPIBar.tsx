@@ -17,11 +17,11 @@ interface KpiTileProps {
 
 const KpiTile = memo(function KpiTile({ label, value, sub, color, pct }: KpiTileProps) {
   return (
-    <div className="flex flex-col justify-center px-3 py-1.5 rounded border border-[#2d3148] bg-[#161927] min-w-[96px]">
-      <span className="text-[9px] text-slate-500 uppercase tracking-widest leading-tight mb-0.5">{label}</span>
-      <span className={`text-sm font-bold font-mono leading-tight ${color}`}>{value}</span>
+    <div className="flex flex-col justify-center px-3 py-2 rounded border border-[#2d3148] bg-[#161927] min-w-[120px]">
+      <span className="text-[10px] text-slate-500 uppercase tracking-widest leading-tight mb-0.5">{label}</span>
+      <span className={`text-[15px] font-bold font-mono leading-tight ${color}`}>{value}</span>
       {pct !== undefined && (
-        <div className="mt-1 h-[3px] bg-[#252840] rounded-full overflow-hidden">
+        <div className="mt-1 h-1 bg-[#252840] rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-700 ${
               pct > 0.9 ? 'bg-red-500' : pct > 0.75 ? 'bg-orange-500' : pct > 0.55 ? 'bg-yellow-500' : 'bg-emerald-500'
@@ -30,7 +30,7 @@ const KpiTile = memo(function KpiTile({ label, value, sub, color, pct }: KpiTile
           />
         </div>
       )}
-      <span className="text-[9px] text-slate-600 leading-tight mt-0.5 truncate">{sub}</span>
+      <span className="text-[10px] text-slate-600 leading-tight mt-0.5">{sub}</span>
     </div>
   )
 })
@@ -102,17 +102,17 @@ export const AssetKPIBar = memo(function AssetKPIBar() {
     : 'text-red-400'
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-[#0f111a] border-b border-[#2d3148] flex-shrink-0 overflow-x-auto">
+    <div className="flex items-center gap-4 px-4 py-2.5 bg-[#0f111a] border-b border-[#2d3148] flex-shrink-0 overflow-x-auto">
 
       {/* ── Transformer Nameplate ────────────────────────────────── */}
-      <div className="flex-shrink-0 border-r border-[#2d3148] pr-3">
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-xs font-bold text-white font-mono">TRF-001</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 font-bold font-mono uppercase tracking-wide">100 MVA</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">230 / 69 kV</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">ONAN/ONAF/OFAF</span>
+      <div className="flex-shrink-0 border-r border-[#2d3148] pr-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-bold text-white font-mono">TRF-001</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 font-bold font-mono uppercase tracking-wide">100 MVA</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">230 / 69 kV</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">ONAN/ONAF/OFAF</span>
         </div>
-        <div className="text-[9px] text-slate-600 leading-tight">
+        <div className="text-[10px] text-slate-500 leading-tight">
           GE Vernova · Substation Alpha, Bay 3 · S/N: GEV-2005-0847 · In service since 2005
         </div>
       </div>

@@ -121,6 +121,10 @@ export interface AppState {
   setSelectedHealthComponent: (key: HealthComponentKey | null) => void
   setPrognostics: (prog: PrognosticsResponse) => void
   addTimelineEvent: (event: TimelineEvent) => void
+
+  // --- Active tab (lifted to store so toasts/alerts can navigate) ---
+  activeTab: string
+  setActiveTab: (tab: string) => void
 }
 
 export const useStore = create<AppState>()((set) => ({
@@ -158,6 +162,7 @@ export const useStore = create<AppState>()((set) => ({
   mode: 'live',
   playbackPosition: null,
   isPlaying: false,
+  activeTab: 'Sensors',
 
   // Actions
   updateReadings(_group, sensors, simTime, timestamp) {
@@ -258,4 +263,5 @@ export const useStore = create<AppState>()((set) => ({
     set((state) => ({
       timelineEvents: [event, ...state.timelineEvents].slice(0, 300), // cap at 300 events
     })),
+  setActiveTab: (tab) => set({ activeTab: tab }),
 }))

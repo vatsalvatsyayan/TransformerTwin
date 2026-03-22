@@ -61,7 +61,8 @@ function PhysicsTabContent() {
 // ─── Main TabContainer ────────────────────────────────────────────────────────
 
 export const TabContainer = memo(function TabContainer() {
-  const [activeTab, setActiveTab] = useState<Tab>('Sensors')
+  const activeTab     = useStore((s) => s.activeTab) as Tab
+  const setActiveTab  = useStore((s) => s.setActiveTab)
   const alertCount    = useActiveAlertCount()
   const decisionRisk  = useStore((s) => s.decision?.risk_level)
   const timelineCount = useStore((s) => s.timelineEvents.length)

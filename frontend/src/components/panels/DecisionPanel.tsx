@@ -446,13 +446,35 @@ export const DecisionPanel = memo(function DecisionPanel() {
                       <svg className={`w-4 h-4 flex-shrink-0 mt-0.5 ${riskColor(risk_level)}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-200 mb-1">{decision_recommendation.action}</p>
                         <p className="text-[10px] text-slate-400 leading-relaxed">{decision_recommendation.reasoning}</p>
                         {decision_recommendation.deadline_hours != null && (
                           <p className="text-[10px] text-orange-400 mt-1 font-medium">
                             Deadline: within {decision_recommendation.deadline_hours} hours
                           </p>
+                        )}
+                        {/* Immediate steps from top active runbook */}
+                        {active_runbooks.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-slate-700/60">
+                            <p className="text-[10px] font-semibold text-slate-400 mb-1.5">
+                              Immediate steps
+                              <span className="font-mono text-slate-600 ml-1">({active_runbooks[0].procedure_id})</span>:
+                            </p>
+                            <ol className="space-y-1">
+                              {active_runbooks[0].steps.slice(0, 3).map((step, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-[10px] text-slate-300">
+                                  <span className="text-slate-600 font-mono flex-shrink-0">{i + 1}.</span>
+                                  <span className="leading-relaxed">{step}</span>
+                                </li>
+                              ))}
+                            </ol>
+                            {active_runbooks[0].steps.length > 3 && (
+                              <p className="text-[9px] text-slate-600 mt-1.5">
+                                +{active_runbooks[0].steps.length - 3} more steps in Runbooks below ↓
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

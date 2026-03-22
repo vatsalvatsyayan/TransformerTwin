@@ -1,7 +1,39 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-22 (Session 20 — Comprehensive diagnosis + 5 bug fixes)
+> Last updated: 2026-03-22 (Session 21 — UI readability + dynamic economics + clickable alerts + specific risk steps)
+
+---
+
+## Current Status: 🟢 Session 21 Complete — UX Polish: Readability, Dynamic Economics, Actionable Alerts
+
+### Session 21 Additions (2026-03-22)
+
+**Context**: Four UX issues identified via visual inspection. All implemented without breaking any existing tests. 28/28 backend + 125/125 frontend tests pass. TypeScript compiles clean.
+
+#### IMPROVEMENT-1: AssetKPIBar readability (`AssetKPIBar.tsx`)
+- Increased KPI tile min-width `96px → 120px`, label font `text-[9px] → text-[10px]`, value font `text-sm → text-[15px]`
+- Progress bar height `h-[3px] → h-1`, tile padding `py-1.5 → py-2`, container gaps increased
+- Nameplate text `text-[9px] → text-[10px]`, ID label `text-xs → text-sm`
+
+#### IMPROVEMENT-2: Dynamic economic analysis (`decision_engine.py`)
+- `act_now` cost now scales with active failure mode count (+25% per FM) and maintenance window (2h base → 4h with Probable fault)
+- `no_action` outage days extend to 10.5 days (from 7) when `risk_score > 0.8`
+- Descriptions now reference specific failure mode names driving cost increases
+- All three scenario totals visibly change as conditions worsen during fault scenarios
+
+#### IMPROVEMENT-3: Clickable alert toasts (`AlertToast.tsx`, `store/index.ts`, `TabContainer.tsx`)
+- Lifted `activeTab` state from TabContainer's local `useState` to Zustand store (`activeTab: string`, `setActiveTab`)
+- AlertToast: removed `pointer-events-none`, added `cursor-pointer` + click handler → switches to Alerts tab + closes toast
+- Added "View in Alerts tab →" footer prompt in the toast UI
+
+#### IMPROVEMENT-4: Specific steps in risk recommendation (`DecisionPanel.tsx`)
+- "Recommended Action" section now shows top 3 steps from the most active runbook inline
+- Steps are numbered with the procedure ID (e.g., OP-TRF-004) for traceability
+- "+N more in Runbooks below ↓" link when runbook has >3 steps
+
+#### Session 21 Log Entry
+| 2026-03-22 | 21 | UX polish: AssetKPIBar readability, dynamic economic analysis, clickable alert toasts (store-lifted tab state), specific runbook steps in risk recommendation. All tests pass. |
 
 ---
 

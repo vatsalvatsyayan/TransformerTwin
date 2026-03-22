@@ -296,23 +296,62 @@ def _compute_economic_impact(
     Returns:
         Dict with "act_now", "act_later", "no_action" cost scenarios.
     """
-    # Act Now: planned maintenance cost + small production loss
-    maintenance_cost = ECONOMIC_PLANNED_MAINTENANCE_USD
-    production_loss = ECONOMIC_MAINTENANCE_PRODUCTION_LOSS_PER_HR_USD * ECONOMIC_MAINTENANCE_WINDOW_HRS
+    # ── Act Now: scale cost by active failure mode severity ──────────────────
+    # More active FMs / higher confidence → more complex job → longer window
+    active_fm_count = len(fmea_results)
+    has_probable = any(fm["confidence_label"] == "Probable" for fm in fmea_results)
+
+    # +25% maintenance cost per active failure mode (extra technician hours)
+    fm_severity_mult = 1.0 + 0.25 * active_fm_count
+
+    # Maintenance window: 2h base → 3h if multiple FMs → 4h if a Probable fault
+    if has_probable:
+        maint_hours = ECONOMIC_MAINTENANCE_WINDOW_HRS * 2.0
+    elif active_fm_count > 1:
+        maint_hours = ECONOMIC_MAINTENANCE_WINDOW_HRS * 1.5
+    else:
+        maint_hours = ECONOMIC_MAINTENANCE_WINDOW_HRS
+
+    maintenance_cost = ECONOMIC_PLANNED_MAINTENANCE_USD * fm_severity_mult
+    production_loss = ECONOMIC_MAINTENANCE_PRODUCTION_LOSS_PER_HR_USD * maint_hours
     act_now_total = maintenance_cost + production_loss
 
-    # Act Later (14 days): higher probability of fault escalation
-    # If risk is already high, fault escalation probability increases
+    # Description: reference the specific failure mode driving complexity
+    if fmea_results:
+        fm_name = fmea_results[0]["name"]
+        act_now_desc = (
+            f"Extended {int(maint_hours)}-hr maintenance window — "
+            f"specialist required for {fm_name}"
+        )
+    else:
+        act_now_desc = (
+            f"Scheduled {int(maint_hours)}-hr maintenance window during off-peak"
+        )
+
+    # ── Act Later (14 days): higher probability of fault escalation ──────────
     fault_escalation_prob = min(0.95, risk_score * 1.2)
     delay_repair_cost = maintenance_cost * ECONOMIC_DELAYED_ESCALATION_FACTOR
     delay_downtime_cost = ECONOMIC_OUTAGE_COST_PER_DAY_USD * (ECONOMIC_EMERGENCY_REPAIR_HRS / 24.0)
     act_later_expected = act_now_total + (fault_escalation_prob * (delay_repair_cost + delay_downtime_cost))
     act_later_total = round(act_later_expected, -2)  # round to nearest $100
 
-    # No Action (failure): replacement + extended outage
+    # ── No Action (failure): replacement + extended outage ───────────────────
+    # High risk → longer outage (spare transformer lead time extends)
+    outage_days = ECONOMIC_REPLACEMENT_OUTAGE_DAYS
+    if risk_score > 0.8:
+        outage_days = ECONOMIC_REPLACEMENT_OUTAGE_DAYS * 1.5  # 10.5 days vs 7
+
     no_action_total = ECONOMIC_TRANSFORMER_REPLACEMENT_USD + (
-        ECONOMIC_OUTAGE_COST_PER_DAY_USD * ECONOMIC_REPLACEMENT_OUTAGE_DAYS
+        ECONOMIC_OUTAGE_COST_PER_DAY_USD * outage_days
     )
+
+    if risk_score > 0.8:
+        no_action_desc = (
+            f"Catastrophic failure — emergency replacement ({int(outage_days)}-day outage, "
+            "extended lead time for spare unit at high risk level)"
+        )
+    else:
+        no_action_desc = "Transformer failure requiring emergency replacement and extended grid outage"
 
     # Potential savings = difference between no_action and act_now
     savings = no_action_total - act_now_total
@@ -324,7 +363,7 @@ def _compute_economic_impact(
             "maintenance_cost": int(maintenance_cost),
             "production_loss": int(production_loss),
             "total": int(act_now_total),
-            "description": f"Scheduled {int(ECONOMIC_MAINTENANCE_WINDOW_HRS)}-hour maintenance window during off-peak",
+            "description": act_now_desc,
         },
         "act_later": {
             "label": "Delay 14 Days",
@@ -338,10 +377,10 @@ def _compute_economic_impact(
         "no_action": {
             "label": "No Action (Failure Risk)",
             "replacement_cost": int(ECONOMIC_TRANSFORMER_REPLACEMENT_USD),
-            "outage_days": int(ECONOMIC_REPLACEMENT_OUTAGE_DAYS),
-            "outage_cost": int(ECONOMIC_OUTAGE_COST_PER_DAY_USD * ECONOMIC_REPLACEMENT_OUTAGE_DAYS),
+            "outage_days": int(outage_days),
+            "outage_cost": int(ECONOMIC_OUTAGE_COST_PER_DAY_USD * outage_days),
             "total": int(no_action_total),
-            "description": "Transformer failure requiring emergency replacement and extended grid outage",
+            "description": no_action_desc,
         },
         "potential_savings_usd": int(savings),
     }

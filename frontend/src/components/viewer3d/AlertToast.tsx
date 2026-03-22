@@ -8,6 +8,7 @@ const TOAST_DURATION_MS = 5000
 
 export const AlertToast = memo(function AlertToast() {
   const alerts = useStore((s) => s.alerts)
+  const setActiveTab = useStore((s) => s.setActiveTab)
   const prevLengthRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [visible, setVisible] = useState(false)
@@ -37,12 +38,18 @@ export const AlertToast = memo(function AlertToast() {
   const isFmea = toastAlert.source === 'FMEA_ENGINE'
   const firstAction = toastAlert.recommended_actions?.[0]
 
+  const handleClick = () => {
+    setActiveTab('Alerts')
+    setVisible(false)
+  }
+
   return (
     <div
-      className={`absolute top-3 right-3 z-50 max-w-[260px] rounded-lg shadow-xl border text-xs pointer-events-none
+      onClick={handleClick}
+      className={`absolute top-3 right-3 z-50 max-w-[280px] rounded-lg shadow-xl border text-xs cursor-pointer
         ${isCritical
-          ? 'bg-red-950/95 border-red-700 text-red-100'
-          : 'bg-orange-950/95 border-orange-700 text-orange-100'
+          ? 'bg-red-950/95 border-red-700 text-red-100 hover:border-red-500'
+          : 'bg-orange-950/95 border-orange-700 text-orange-100 hover:border-orange-500'
         }`}
       style={{ animation: 'fadeSlideIn 0.25s ease-out' }}
     >
@@ -69,6 +76,16 @@ export const AlertToast = memo(function AlertToast() {
             → {firstAction}
           </div>
         )}
+
+        {/* Click-to-navigate hint */}
+        <div className={`mt-2 pt-1.5 border-t text-[10px] flex items-center gap-1 ${
+          isCritical ? 'border-red-800/60 text-red-400' : 'border-orange-800/60 text-orange-400'
+        }`}>
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+          View in Alerts tab
+        </div>
       </div>
     </div>
   )
