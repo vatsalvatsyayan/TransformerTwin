@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import routes_alerts, routes_decision, routes_dga, routes_fmea, routes_health
-from api import routes_scenario, routes_sensor, routes_simulation
+from api import routes_operator, routes_scenario, routes_sensor, routes_simulation
 from api import routes_speed, routes_transformer
 from api.websocket_handler import router as ws_router, manager as ws_manager, set_engine
 from config import API_PREFIX, CORS_ALLOWED_ORIGIN
@@ -147,6 +147,7 @@ app.include_router(routes_simulation.router, prefix=API_PREFIX)
 app.include_router(routes_scenario.router, prefix=API_PREFIX)
 app.include_router(routes_speed.router, prefix=API_PREFIX)
 app.include_router(routes_decision.router, prefix=API_PREFIX)
+app.include_router(routes_operator.router, prefix=API_PREFIX)
 
 # ---------------------------------------------------------------------------
 # WebSocket endpoint (no prefix — path is /ws)

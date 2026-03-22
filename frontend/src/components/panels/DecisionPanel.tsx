@@ -1,8 +1,10 @@
-// Decision Support Panel — prescriptive analytics: risk, economics, runbooks
+// Decision Support Panel — prescriptive analytics + operator controls
 
 import { memo, useState } from 'react'
 import { useStore } from '../../store'
+import { api } from '../../lib/api'
 import type { RiskLevel, OperatorRunbook, EconomicImpact } from '../../types/decision'
+import type { OperatorAction } from '../../types/operator'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -218,99 +220,261 @@ function RunbookCard({ runbook }: { runbook: OperatorRunbook }) {
   )
 }
 
+// ─── Operator Controls ────────────────────────────────────────────────────────
+
+function OperatorControls() {
+  const operatorStatus = useStore((s) => s.operatorStatus)
+  const setOperatorStatus = useStore((s) => s.setOperatorStatus)
+  const [pending, setPending] = useState<OperatorAction | null>(null)
+  const [feedback, setFeedback] = useState<string | null>(null)
+
+  const execute = async (action: OperatorAction) => {
+    setPending(action)
+    setFeedback(null)
+    try {
+      const status = await api.executeOperatorAction(action)
+      setOperatorStatus(status)
+      if (action === 'CLEAR_ALL' || action === 'RESTORE_LOAD' || action === 'RESTORE_COOLING') {
+        setFeedback(null)
+      } else {
+        setFeedback(status.message)
+      }
+    } catch (err) {
+      setFeedback('Action failed — check backend connection.')
+      console.error('Operator action failed:', err)
+    } finally {
+      setPending(null)
+    }
+  }
+
+  const hasOverrides = operatorStatus?.active_overrides ?? false
+  const loadPct = operatorStatus?.load_override_pct
+  const coolingMode = operatorStatus?.cooling_override
+
+  return (
+    <div className="rounded-lg border border-[#2d3148] bg-[#161927] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2d3148]">
+        <div className="flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Operator Controls</span>
+        </div>
+        {hasOverrides && (
+          <button
+            onClick={() => void execute('CLEAR_ALL')}
+            disabled={pending !== null}
+            className="text-[9px] px-2 py-0.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors font-medium"
+          >
+            Restore Normal
+          </button>
+        )}
+      </div>
+
+      {/* Active overrides banner */}
+      {hasOverrides && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-900/20 border-b border-emerald-800/40">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[10px] text-emerald-300 font-medium">Active: {operatorStatus?.message.replace('Active overrides: ', '')}</span>
+        </div>
+      )}
+
+      <div className="p-3 space-y-3">
+        {/* Load Management */}
+        <div>
+          <p className="text-[9px] text-slate-600 uppercase tracking-wide mb-1.5 font-medium">Load Management</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { label: '70% Load', action: 'REDUCE_LOAD_70' as OperatorAction, active: loadPct === 70, desc: 'Reduce thermal stress', color: 'yellow' },
+              { label: '40% Load', action: 'REDUCE_LOAD_40' as OperatorAction, active: loadPct === 40, desc: 'Emergency reduction', color: 'red' },
+              { label: 'Full Load', action: 'RESTORE_LOAD' as OperatorAction, active: loadPct === null, desc: 'Normal profile', color: 'slate' },
+            ].map(({ label, action, active, desc, color }) => (
+              <button
+                key={action}
+                onClick={() => void execute(action)}
+                disabled={pending !== null || active}
+                title={desc}
+                className={`px-2 py-2 rounded text-[10px] font-semibold transition-all border ${
+                  active
+                    ? color === 'yellow'
+                      ? 'bg-yellow-900/40 border-yellow-600 text-yellow-300 ring-1 ring-yellow-500/50'
+                      : color === 'red'
+                        ? 'bg-red-900/40 border-red-600 text-red-300 ring-1 ring-red-500/50'
+                        : 'bg-emerald-900/30 border-emerald-700 text-emerald-300'
+                    : pending === action
+                      ? 'bg-[#1e2238] border-[#2d3148] text-slate-500 animate-pulse'
+                      : 'bg-[#1e2238] border-[#2d3148] text-slate-400 hover:bg-[#252840] hover:text-slate-200 hover:border-slate-500'
+                }`}
+              >
+                {active && (
+                  <svg className="w-2.5 h-2.5 mx-auto mb-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Cooling Mode */}
+        <div>
+          <p className="text-[9px] text-slate-600 uppercase tracking-wide mb-1.5 font-medium">Cooling Mode</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { label: 'Auto', action: 'RESTORE_COOLING' as OperatorAction, active: coolingMode === null, desc: 'Automatic fan/pump control', color: 'slate' },
+              { label: 'ONAF', action: 'UPGRADE_COOLING_ONAF' as OperatorAction, active: coolingMode === 'ONAF', desc: 'Force fans ON (natural oil)', color: 'blue' },
+              { label: 'OFAF', action: 'UPGRADE_COOLING_OFAF' as OperatorAction, active: coolingMode === 'OFAF', desc: 'Force fans + oil pump ON', color: 'cyan' },
+            ].map(({ label, action, active, desc, color }) => (
+              <button
+                key={action}
+                onClick={() => void execute(action)}
+                disabled={pending !== null || active}
+                title={desc}
+                className={`px-2 py-2 rounded text-[10px] font-semibold transition-all border ${
+                  active
+                    ? color === 'blue'
+                      ? 'bg-blue-900/40 border-blue-600 text-blue-300 ring-1 ring-blue-500/50'
+                      : color === 'cyan'
+                        ? 'bg-cyan-900/40 border-cyan-600 text-cyan-300 ring-1 ring-cyan-500/50'
+                        : 'bg-emerald-900/30 border-emerald-700 text-emerald-300'
+                    : pending === action
+                      ? 'bg-[#1e2238] border-[#2d3148] text-slate-500 animate-pulse'
+                      : 'bg-[#1e2238] border-[#2d3148] text-slate-400 hover:bg-[#252840] hover:text-slate-200 hover:border-slate-500'
+                }`}
+              >
+                {active && (
+                  <svg className="w-2.5 h-2.5 mx-auto mb-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Feedback message */}
+        {feedback && (
+          <p className="text-[10px] text-emerald-400 bg-emerald-900/20 border border-emerald-800/40 rounded px-2 py-1.5 leading-relaxed">
+            ✓ {feedback}
+          </p>
+        )}
+
+        <p className="text-[9px] text-slate-700 leading-relaxed">
+          Changes apply immediately to live simulation. Use "Restore Normal" to revert all overrides.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main panel ─────────────────────────────────────────────────────────────
 
 export const DecisionPanel = memo(function DecisionPanel() {
   const decision = useStore((s) => s.decision)
 
-  if (!decision) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-10 text-slate-500">
-        <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-        <span className="text-xs font-medium">Loading decision analysis…</span>
-      </div>
-    )
-  }
-
-  const { risk_level, risk_score, risk_description, time_to_action_hours,
-    economic_impact, decision_recommendation, active_runbooks } = decision
-
   return (
     <div className="p-3 space-y-4 text-xs">
 
-      {/* ── Risk Assessment ── */}
+      {/* ── Operator Controls — always shown ── */}
       <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Asset Risk Assessment</h3>
-          {time_to_action_hours != null && (
-            <span className="text-[10px] font-mono text-orange-400">
-              Action threshold in ~{time_to_action_hours}h
-            </span>
-          )}
-        </div>
-        <RiskBadge level={risk_level} score={risk_score} description={risk_description} />
+        <OperatorControls />
       </section>
 
-      {/* ── Decision Recommendation ── */}
-      <section>
-        <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Recommended Action</h3>
-        <div className={`rounded-lg border p-3 ${riskBg(risk_level)}`}>
-          <div className="flex items-start gap-2">
-            <svg className={`w-4 h-4 flex-shrink-0 mt-0.5 ${riskColor(risk_level)}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <p className="font-semibold text-slate-200 mb-1">{decision_recommendation.action}</p>
-              <p className="text-[10px] text-slate-400 leading-relaxed">{decision_recommendation.reasoning}</p>
-              {decision_recommendation.deadline_hours != null && (
-                <p className="text-[10px] text-orange-400 mt-1 font-medium">
-                  Deadline: within {decision_recommendation.deadline_hours} hours
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Economic Impact ── */}
-      {economic_impact?.act_now && (
-        <section>
-          <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Economic Impact Analysis</h3>
-          <EconomicTable impact={economic_impact} />
-        </section>
-      )}
-
-      {/* ── Operator Runbooks ── */}
-      {active_runbooks.length > 0 && (
-        <section>
-          <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-            Operator Runbooks ({active_runbooks.length} active)
-          </h3>
-          <div className="space-y-2">
-            {active_runbooks.map((rb) => (
-              <RunbookCard key={rb.failure_mode_id} runbook={rb} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Empty state when system is nominal */}
-      {active_runbooks.length === 0 && risk_level === 'NOMINAL' && (
-        <div className="flex flex-col items-center gap-2 py-6 text-slate-600">
+      {!decision ? (
+        <div className="flex flex-col items-center gap-2 py-6 text-slate-500">
           <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
-          <span className="text-xs font-medium">All systems nominal</span>
-          <span className="text-[10px] text-slate-700">No operator actions required</span>
+          <span className="text-xs font-medium">Loading decision analysis…</span>
         </div>
-      )}
+      ) : (
+        <>
+          {(() => {
+            const { risk_level, risk_score, risk_description, time_to_action_hours,
+              economic_impact, decision_recommendation, active_runbooks } = decision
 
-      {/* Disclaimer */}
-      <p className="text-[9px] text-slate-700 text-center border-t border-[#2d3148] pt-3">
-        Economic estimates based on industry averages. Consult asset manager before operational changes.
-      </p>
+            return (
+              <>
+                {/* ── Risk Assessment ── */}
+                <section>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Asset Risk Assessment</h3>
+                    {time_to_action_hours != null && (
+                      <span className="text-[10px] font-mono text-orange-400">
+                        Action threshold in ~{time_to_action_hours}h
+                      </span>
+                    )}
+                  </div>
+                  <RiskBadge level={risk_level} score={risk_score} description={risk_description} />
+                </section>
+
+                {/* ── Decision Recommendation ── */}
+                <section>
+                  <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Recommended Action</h3>
+                  <div className={`rounded-lg border p-3 ${riskBg(risk_level)}`}>
+                    <div className="flex items-start gap-2">
+                      <svg className={`w-4 h-4 flex-shrink-0 mt-0.5 ${riskColor(risk_level)}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold text-slate-200 mb-1">{decision_recommendation.action}</p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">{decision_recommendation.reasoning}</p>
+                        {decision_recommendation.deadline_hours != null && (
+                          <p className="text-[10px] text-orange-400 mt-1 font-medium">
+                            Deadline: within {decision_recommendation.deadline_hours} hours
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* ── Economic Impact ── */}
+                {economic_impact?.act_now && (
+                  <section>
+                    <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Economic Impact Analysis</h3>
+                    <EconomicTable impact={economic_impact} />
+                  </section>
+                )}
+
+                {/* ── Operator Runbooks ── */}
+                {active_runbooks.length > 0 && (
+                  <section>
+                    <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
+                      Operator Runbooks ({active_runbooks.length} active)
+                    </h3>
+                    <div className="space-y-2">
+                      {active_runbooks.map((rb) => (
+                        <RunbookCard key={rb.failure_mode_id} runbook={rb} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Empty state when system is nominal */}
+                {active_runbooks.length === 0 && risk_level === 'NOMINAL' && (
+                  <div className="flex flex-col items-center gap-2 py-4 text-slate-600">
+                    <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                    </svg>
+                    <span className="text-xs font-medium">All systems nominal</span>
+                    <span className="text-[10px] text-slate-700">No operator actions required</span>
+                  </div>
+                )}
+
+                {/* Disclaimer */}
+                <p className="text-[9px] text-slate-700 text-center border-t border-[#2d3148] pt-3">
+                  Economic estimates based on industry averages. Consult asset manager before operational changes.
+                </p>
+              </>
+            )
+          })()}
+        </>
+      )}
     </div>
   )
 })

@@ -1,4 +1,4 @@
-// Fan unit disc (instantiated ×2)
+// Fan unit disc (instantiated ×2) — ON/OFF colour + selection highlight for cooling
 
 import { memo } from 'react'
 import { useStore } from '../../../store'
@@ -14,7 +14,13 @@ export interface FanUnitProps {
 
 export const FanUnit = memo(function FanUnit({ position, sensorId, onHover, onHoverEnd, onClick }: FanUnitProps) {
   const reading = useStore((s) => s.readings[sensorId])
+  const isSelected = useStore((s) => s.selectedHealthComponent === 'cooling')
   const isOn = reading ? reading.value > 0 : false
+
+  // Selection overrides ON/OFF colors — bright cyan highlight
+  const color = isSelected ? '#bae6fd' : (isOn ? '#22c55e' : '#475569')
+  const emissive = isSelected ? '#38bdf8' : (isOn ? '#166534' : '#000000')
+  const emissiveIntensity = isSelected ? 1.8 : (isOn ? 0.3 : 0)
 
   return (
     <mesh
@@ -26,8 +32,9 @@ export const FanUnit = memo(function FanUnit({ position, sensorId, onHover, onHo
     >
       <cylinderGeometry args={[0.3, 0.3, 0.05, 16]} />
       <meshStandardMaterial
-        color={isOn ? '#22c55e' : '#475569'}
-        emissive={isOn ? '#166534' : '#000000'}
+        color={color}
+        emissive={emissive}
+        emissiveIntensity={emissiveIntensity}
         metalness={0.5}
         roughness={0.4}
       />

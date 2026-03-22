@@ -67,3 +67,10 @@ export async function fetchDecision(): Promise<void> {
   const store = useStore.getState()
   store.setDecision(data)
 }
+
+/** Fetches operator override status and stores it */
+export async function fetchOperatorStatus(): Promise<void> {
+  const data = await api.getOperatorStatus()
+  const store = useStore.getState()
+  store.setOperatorStatus(data)
+}

@@ -145,4 +145,18 @@
 - **Rationale**: 1% of the caution→warning band is a physically reasonable noise floor. For TOP_OIL_TEMP (range=15°C), this is 0.15°C — realistic sensor noise is well below this. An actual anomaly should deviate by multiple sensor ranges, not fractions of a degree. This matches the spec in MEMORY.md.
 - **Trade-off**: Marginally increases the minimum detectable anomaly size, which is correct behavior. Alert flooding was far more harmful to the demo than a slightly higher detection threshold.
 
+## ADR-021: Health Component selection drives 3D highlight via useHealthColor hook
+- **Date**: 2026-03-21
+- **Context**: Users wanted to click a health component in the panel and see the corresponding 3D parts highlighted on the model, creating a bidirectional link between the data panel and the 3D view.
+- **Decision**: Added `selectedHealthComponent: HealthComponentKey | null` to Zustand store. Modified `useHealthColor(key)` to check if `selectedHealthComponent === key` — if true, returns a bright cyan emissive override instead of the health status color. This means ALL mesh parts using that health key automatically glow without any prop changes.
+- **Rationale**: The hook-based approach propagates the selection to all 3D parts with zero prop drilling — any part component that calls `useHealthColor(key)` gets the selection highlight for free. Only FanUnit needed special handling since it doesn't use `useHealthColor` (it uses ON/OFF sensor state for color).
+- **Trade-off**: The selection is stored globally (one component at a time). Two overlapping health components can't both be selected. This is correct behavior for the demo.
+
+## ADR-022: Operator overrides applied as physics inputs, not post-processing
+- **Date**: 2026-03-21
+- **Context**: Need operator interventions (load reduction, cooling upgrade) to produce realistic physical responses — temperatures should actually change, not just display labels.
+- **Decision**: `operator_load_override` and `operator_cooling_override` are applied as inputs to the physics tick (before thermal model and equipment model). They override the sinusoidal load profile and scenario cooling override respectively. Operator cooling takes precedence over scenario overrides.
+- **Rationale**: Applying overrides as physics inputs means the IEC 60076-7 thermal model computes the correct response — load reduction reduces winding power dissipation → slower heat generation → temperatures plateau and decline. This is what a real digital twin should do: simulate the consequence of operator actions.
+- **Trade-off**: Operator overrides persist indefinitely until explicitly cleared. If a scenario completes while overrides are set, the operator must manually clear them. This is acceptable and physically realistic — operators don't automatically restore normal load when an alarm clears.
+
 *Add new ADRs below as decisions are made during implementation.*

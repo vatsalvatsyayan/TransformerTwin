@@ -247,6 +247,10 @@ class SimulatorEngine:
         self._last_dga_emit: float = -DGA_UPDATE_INTERVAL_SIM_S
         self._last_diag_emit: float = -DIAGNOSTIC_UPDATE_INTERVAL_SIM_S
 
+        # Operator overrides — set by REST endpoints, applied each tick
+        self.operator_load_override: float | None = None
+        self.operator_cooling_override: str | None = None
+
         # Callbacks registered by the WebSocket handler / persistence layer
         self._sensor_callbacks: list = []
         self._health_callbacks: list = []
@@ -259,13 +263,40 @@ class SimulatorEngine:
     # ------------------------------------------------------------------
 
     def set_speed(self, multiplier: int) -> None:
-        """Change simulation speed multiplier (1–60).
+        """Change simulation speed multiplier (1–200).
 
         Args:
             multiplier: New time acceleration factor.
         """
         self.speed = max(1, min(200, multiplier))
         logger.info("Simulation speed set to %dx", self.speed)
+
+    def set_operator_load(self, load_fraction: float | None) -> None:
+        """Override the load fraction used in physics.  None restores normal profile.
+
+        Args:
+            load_fraction: Fixed load fraction (0.0–1.2) or None to clear.
+        """
+        self.operator_load_override = load_fraction
+        logger.info(
+            "Operator load override: %s",
+            f"{load_fraction * 100:.0f}%" if load_fraction is not None else "cleared",
+        )
+
+    def set_operator_cooling(self, mode: str | None) -> None:
+        """Override the cooling mode used in physics.  None restores automatic control.
+
+        Args:
+            mode: "ONAN", "ONAF", or "OFAF", or None to clear.
+        """
+        self.operator_cooling_override = mode
+        logger.info("Operator cooling override: %s", mode if mode is not None else "cleared")
+
+    def clear_operator_overrides(self) -> None:
+        """Remove all operator overrides — return to normal automatic operation."""
+        self.operator_load_override = None
+        self.operator_cooling_override = None
+        logger.info("All operator overrides cleared.")
 
     def register_sensor_callback(self, cb) -> None:  # noqa: ANN001
         """Register a coroutine to be called on each sensor group update."""
@@ -342,10 +373,16 @@ class SimulatorEngine:
         cooling_override: str | None = thermal_mods.get("cooling_mode_override", None)
 
         # --- 3. Load + ambient profiles ---
-        load_fraction = get_load_fraction(self.sim_time)
+        # Operator load override takes precedence over the normal sinusoidal profile.
+        if self.operator_load_override is not None:
+            load_fraction = self.operator_load_override
+        else:
+            load_fraction = get_load_fraction(self.sim_time)
         ambient_temp = get_ambient_temp(self.sim_time)
 
         # --- 4. Equipment model (derives cooling mode) ---
+        # Operator cooling override takes precedence over scenario override.
+        effective_cooling_override = self.operator_cooling_override or cooling_override
         equip = self.equipment_model.update(
             top_oil_temp=self.state.top_oil_temp,
             load_fraction=load_fraction,
@@ -354,7 +391,7 @@ class SimulatorEngine:
             oil_pump_1=self.state.oil_pump_1,
             tap_position=self.state.tap_position,
             tap_op_count=self.state.tap_op_count,
-            cooling_mode_override=cooling_override,
+            cooling_mode_override=effective_cooling_override,
         )
         cooling_mode: str = equip["cooling_mode"]
 

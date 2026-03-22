@@ -9,6 +9,7 @@ import type { FMEAResponse } from '../types/fmea'
 import type { ScenarioId } from '../types/scenario'
 import type { ConnectionState } from '../types/websocket'
 import type { DecisionResponse } from '../types/decision'
+import type { OperatorStatus } from '../types/operator'
 
 /** Maximum history points kept per sensor in the in-memory ring buffer */
 export const SENSOR_HISTORY_BUFFER_SIZE = 720
@@ -55,6 +56,12 @@ export interface AppState {
   // --- Decision ---
   decision: DecisionResponse | null
 
+  // --- Operator controls ---
+  operatorStatus: OperatorStatus | null
+
+  // --- Health component selection (drives 3D highlight) ---
+  selectedHealthComponent: HealthComponentKey | null
+
   // --- Playback ---
   mode: PlaybackMode
   playbackPosition: string | null
@@ -94,6 +101,8 @@ export interface AppState {
   setPlaybackPosition: (position: string) => void
   setIsPlaying: (playing: boolean) => void
   setDecision: (decision: DecisionResponse) => void
+  setOperatorStatus: (status: OperatorStatus) => void
+  setSelectedHealthComponent: (key: HealthComponentKey | null) => void
 }
 
 export const useStore = create<AppState>()((set) => ({
@@ -121,6 +130,8 @@ export const useStore = create<AppState>()((set) => ({
   simTime: 0,
   wallClockTime: null,
   decision: null,
+  operatorStatus: null,
+  selectedHealthComponent: null,
   mode: 'live',
   playbackPosition: null,
   isPlaying: false,
@@ -214,4 +225,6 @@ export const useStore = create<AppState>()((set) => ({
   setPlaybackPosition: (position) => set({ playbackPosition: position }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setDecision: (decision) => set({ decision }),
+  setOperatorStatus: (status) => set({ operatorStatus: status }),
+  setSelectedHealthComponent: (key) => set({ selectedHealthComponent: key }),
 }))

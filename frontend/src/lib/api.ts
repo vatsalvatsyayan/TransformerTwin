@@ -7,6 +7,7 @@ import type { HealthResponse, HealthHistoryPoint } from '../types/health'
 import type { ScenarioStatusResponse, ScenarioTriggerResponse } from '../types/scenario'
 import type { SimulationRequest, SimulationResponse } from '../types/simulation'
 import type { DecisionResponse } from '../types/decision'
+import type { OperatorAction, OperatorStatus } from '../types/operator'
 import type { SensorId } from '../types/sensors'
 
 const BASE_URL = 'http://localhost:8001'
@@ -85,12 +86,18 @@ export const api = {
       body: JSON.stringify({ speed_multiplier: multiplier }),
     }),
 
-  /** Return all sensor readings closest to (at or before) the given sim_time. */
   getDecision: () => request<DecisionResponse>('/api/decision'),
 
-  /** Return all sensor readings closest to (at or before) the given sim_time. */
   getSensorsSnapshot: (simTime: number) =>
     request<{ timestamp: string; sim_time: number; sensors: Record<string, unknown> }>(
       `/api/sensors/snapshot?sim_time=${simTime}`,
     ),
+
+  executeOperatorAction: (action: OperatorAction) =>
+    request<OperatorStatus>('/api/operator/actions', {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+
+  getOperatorStatus: () => request<OperatorStatus>('/api/operator/status'),
 }

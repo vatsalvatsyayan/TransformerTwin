@@ -1,11 +1,56 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 12 — Decision Support System + speed improvements)
+> Last updated: 2026-03-21 (Session 13 — Operator Controls, Speed Fix, Health→3D Highlight)
 
 ---
 
-## Current Status: 🟢 Session 12 Complete — Decision Support Panel, 200x speed, actionable anomaly alerts
+## Current Status: 🟢 Session 13 Complete — Operator Controls, Speed 100×/200× fixed, Health→3D Highlight
+
+### Session 13 Additions (2026-03-21)
+
+#### Bug Fix: Speed 100×/200× not activating
+- Root cause: `SpeedUpdateRequestSchema` had `Field(ge=1, le=60)` — Pydantic rejected 100 and 200
+- Fix: changed to `Field(ge=1, le=200)` in `backend/models/schemas.py`
+- Also fixed `engine.py` docstring ("1–60" → "1–200")
+
+#### Feature: Health Component → 3D Highlight
+Clicking a health component row in HealthBreakdown now highlights the corresponding 3D parts:
+- `HealthBreakdown.tsx`: rows are now clickable buttons; selected row shown with cyan ring + sky-blue bar
+- `useHealthColor.ts`: when `selectedHealthComponent === key`, returns `{ emissive: '#38bdf8', emissiveIntensity: 1.8 }` (bright cyan override)
+- `store/index.ts`: added `selectedHealthComponent: HealthComponentKey | null` + `setSelectedHealthComponent`
+- `types/parts.ts`: added `healthKey: 'cooling'` to `fan_1` and `fan_2` entries
+- `parts/FanUnit.tsx`: reads `selectedHealthComponent === 'cooling'` from store, overrides ON/OFF color with cyan when selected
+- Click the same row again to deselect and clear the 3D highlight
+- Mapping: DGA→Buchholz relay, Winding→Tap Changer, Oil Temp→Tank, Cooling→Radiator+Fans+Pump, Oil Quality→Conservator, Bushing→HV+LV Bushings
+
+#### Feature: Operator Control System (the killer demo feature)
+Real-time operator interventions that directly affect the physics simulation:
+
+**Backend:**
+- `backend/api/routes_operator.py` (NEW): `POST /api/operator/actions`, `GET /api/operator/status`
+- `backend/simulator/engine.py`: added `operator_load_override: float | None` + `operator_cooling_override: str | None`
+  - `set_operator_load(fraction)` / `set_operator_cooling(mode)` / `clear_operator_overrides()`
+  - Applied in `_tick()`: operator overrides take precedence over normal profile and scenario overrides
+- `backend/models/schemas.py`: added `OperatorActionRequestSchema`, `OperatorStatusResponseSchema`, `OperatorActionType`
+- `backend/main.py`: registered `/api/operator/actions` and `/api/operator/status` routes
+
+**Frontend:**
+- `frontend/src/types/operator.ts` (NEW): `OperatorAction` union type + `OperatorStatus` interface
+- `frontend/src/lib/api.ts`: added `executeOperatorAction()`, `getOperatorStatus()`
+- `frontend/src/hooks/useApi.ts`: added `fetchOperatorStatus()`
+- `frontend/src/store/index.ts`: added `operatorStatus`, `setOperatorStatus`
+- `frontend/src/App.tsx`: initial fetch + 5s polling for operator status
+- `frontend/src/components/panels/DecisionPanel.tsx`: **Operator Controls** section (always shown at top of Decision tab)
+  - Load Management: 70% Load / 40% Load / Full Load (toggle buttons, active state shown with checkmark)
+  - Cooling Mode: Auto / ONAF / OFAF (toggle buttons)
+  - Active overrides: pulsing green banner "Active: Load 70% + ONAF cooling"
+  - "Restore Normal" button clears all overrides
+  - Immediate feedback message after each action
+
+**Demo sequence**: trigger hot_spot → watch winding temp climb → click "70% Load" + "ONAF" → watch temperatures flatten and recover over ~30 real seconds at 30× speed. This closes the feedback loop and turns the system from passive monitoring to active control.
+
+All tests still pass: 28/28 backend, 125/125 frontend.
 
 ### Session 12 Additions (2026-03-21)
 - **Speed options expanded**: Now supports 1×, 10×, 30×, 60×, 100×, 200× (was capped at 60×). At 200× you can watch a full 3-hour fault scenario in 54 real seconds.

@@ -362,7 +362,7 @@ class ScenarioStatusResponseSchema(BaseModel):
 # ---------------------------------------------------------------------------
 
 class SpeedUpdateRequestSchema(BaseModel):
-    speed_multiplier: int = Field(ge=1, le=60)
+    speed_multiplier: int = Field(ge=1, le=200)
 
 
 class SpeedEffectiveIntervalsSchema(BaseModel):
@@ -375,6 +375,32 @@ class SpeedEffectiveIntervalsSchema(BaseModel):
 class SpeedUpdateResponseSchema(BaseModel):
     speed_multiplier: int
     effective_intervals: SpeedEffectiveIntervalsSchema
+
+
+# ---------------------------------------------------------------------------
+# REST: Operator action control
+# ---------------------------------------------------------------------------
+
+OperatorActionType = Literal[
+    "REDUCE_LOAD_70",       # Override load to 70% rated
+    "REDUCE_LOAD_40",       # Emergency: override load to 40% rated
+    "RESTORE_LOAD",         # Clear load override — return to normal profile
+    "UPGRADE_COOLING_ONAF", # Force ONAF cooling mode (forced air)
+    "UPGRADE_COOLING_OFAF", # Force OFAF cooling mode (forced oil + forced air)
+    "RESTORE_COOLING",      # Clear cooling override — return to automatic control
+    "CLEAR_ALL",            # Clear all operator overrides
+]
+
+
+class OperatorActionRequestSchema(BaseModel):
+    action: OperatorActionType
+
+
+class OperatorStatusResponseSchema(BaseModel):
+    load_override_pct: int | None = None
+    cooling_override: str | None = None
+    active_overrides: bool
+    message: str
 
 
 # ---------------------------------------------------------------------------

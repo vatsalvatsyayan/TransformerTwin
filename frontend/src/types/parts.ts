@@ -63,12 +63,14 @@ export const PART_META: Record<PartId, PartMeta> = {
     label: 'Fan Bank 1',
     description:
       'Stage-1 forced-air cooling fans on the left radiator bank. Activated automatically when top-oil temperature exceeds 65 °C; deactivated below 60 °C.',
+    healthKey: 'cooling',
     sensorIds: ['FAN_BANK_1'],
   },
   fan_2: {
     label: 'Fan Bank 2',
     description:
       'Stage-2 forced-air cooling fans on the right radiator bank. Activated when top-oil temperature exceeds 75 °C; deactivated below 70 °C.',
+    healthKey: 'cooling',
     sensorIds: ['FAN_BANK_2'],
   },
   oil_pump: {
