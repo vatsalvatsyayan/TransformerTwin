@@ -7,13 +7,6 @@
 
 ## Open
 
-### 🔧 ISSUE-007: Playback slider max is `simTime` at component render (not live-updating)
-- **Found**: Phase 4.6 (2026-03-21)
-- **Severity**: Low
-- **Description**: The range slider in `BottomTimeline.tsx` uses `Math.max(simTime, 1)` as the `max` attribute. `simTime` is read from the Zustand store, so it does update as the sim runs. However, when the user is in playback mode, `simTime` still advances (the WebSocket suppression only affects `updateReadings`/`updateHealth`, not `setSimTime` via `sensor_update` messages — wait, actually `setSimTime` is also suppressed because it's inside the `mode === 'live'` block). In playback mode `simTime` will freeze at the value when playback was entered.
-- **Impact**: If a user enters playback mode early (low simTime), the slider max will be frozen at that value. They can exit playback and re-enter to get an updated max.
-- **Resolution**: Expose `maxSimTime` separately in the store, always updated regardless of mode. Low priority.
-
 ### 🔧 ISSUE-008: SQLite snapshot query uses bare-column behaviour (SQLite-specific)
 - **Found**: Phase 4.6 backend (2026-03-21)
 - **Severity**: Low
@@ -52,6 +45,32 @@
 ---
 
 ## Resolved
+
+### ✅ ISSUE-023: WebSocket reconnects on every playback mode toggle (Session 17)
+- **Found**: Session 17 user report — "app refreshes"
+- **Severity**: Critical — app tore down and rebuilt the WS connection every time the user clicked LIVE/playback, causing brief data loss and racing store writes from parallel connections
+- **Description**: `mode` was in `handleMessage`'s `useCallback` dep array → `connect` was recreated on every mode change → `useEffect([connect])` re-ran, closing the old socket and opening a new one
+- **Resolution**: Replaced `const mode = useStore(s => s.mode)` with a `modeRef` ref + syncing `useEffect`. `handleMessage` and `connect` are now stable for the app lifetime.
+
+### ✅ ISSUE-024: React StrictMode created 2–3 simultaneous WebSocket connections (Session 17)
+- **Found**: Session 17 analysis — "can't click buttons" caused by racing store writes
+- **Severity**: High (in development) — StrictMode double-invocation fired `onclose` from stale closure, opening a parallel connection if the new socket was still CONNECTING
+- **Resolution**: Added `isIntentionalCloseRef` to mark cleanup closes; `onclose` skips reconnect when intentional. Added `readyState === CONNECTING` check to the guard so stale closures can't open duplicate connections.
+
+### ✅ ISSUE-025: Health strip 142px tall, cramping tab content on smaller screens (Session 17)
+- **Found**: Session 17 analysis — partial cause of "can't click buttons" (buttons below fold)
+- **Severity**: Medium — on 14" laptops, only ~385px of tab content remained during fault scenarios
+- **Resolution**: Added `compact` prop to `HealthBreakdown`. Compact mode shows 6 inline colored-dot chips (~1–2 rows) instead of 6 tall bar rows. Strip reduced from ~142px to ~44px.
+
+### ✅ ISSUE-026: ScenarioProgressBar caused ~90px layout shift when fault scenario started (Session 17)
+- **Found**: Session 17 analysis — clicking buttons mid-scenario was unreliable
+- **Severity**: Medium — the bar appeared as a new flex-shrink-0 block pushing all content down by 90px
+- **Resolution**: Rewritten as compact single-line strip (~32px): "⚡ [Name] [mini-bar] [X%]". Layout shift gone.
+
+### ✅ ISSUE-007: Playback slider max froze when entering playback (Session 17)
+- **Found**: Phase 4.6 (2026-03-21), re-confirmed Session 17
+- **Severity**: Low → fixed
+- **Resolution**: Added `maxAvailableSimTime` to Zustand store, always updated via `setMaxAvailableSimTime` regardless of mode. Slider `max` now reflects the full available history range.
 
 ### ✅ ISSUE-017: HealthGauge and HealthBreakdown components never rendered
 - **Found**: Session 8 Playwright QA (2026-03-21)

@@ -57,6 +57,8 @@ export interface AppState {
   speedMultiplier: number
   simTime: number
   wallClockTime: string | null
+  // Always updated (even in playback mode) so the scrubber max reflects full history
+  maxAvailableSimTime: number
 
   // --- Decision ---
   decision: DecisionResponse | null
@@ -109,6 +111,7 @@ export interface AppState {
   setConnectionStatus: (status: ConnectionState) => void
   setSpeedMultiplier: (speed: number) => void
   setSimTime: (simTime: number, wallClock: string) => void
+  setMaxAvailableSimTime: (t: number) => void
   enterPlayback: (position: string) => void
   exitPlayback: () => void
   setPlaybackPosition: (position: string) => void
@@ -146,6 +149,7 @@ export const useStore = create<AppState>()((set) => ({
   speedMultiplier: 1,
   simTime: 0,
   wallClockTime: null,
+  maxAvailableSimTime: 0,
   decision: null,
   operatorStatus: null,
   prognostics: null,
@@ -241,6 +245,7 @@ export const useStore = create<AppState>()((set) => ({
   setConnectionStatus: (status) => set({ connectionStatus: status }),
   setSpeedMultiplier: (speed) => set({ speedMultiplier: speed }),
   setSimTime: (simTime, wallClock) => set({ simTime, wallClockTime: wallClock }),
+  setMaxAvailableSimTime: (t) => set((s) => t > s.maxAvailableSimTime ? { maxAvailableSimTime: t } : {}),
   enterPlayback: (position) => set({ mode: 'playback', playbackPosition: position, isPlaying: false }),
   exitPlayback: () => set({ mode: 'live', playbackPosition: null, isPlaying: false }),
   setPlaybackPosition: (position) => set({ playbackPosition: position }),

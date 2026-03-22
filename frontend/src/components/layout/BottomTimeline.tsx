@@ -8,8 +8,9 @@ import { api } from '../../lib/api'
 import type { SensorReadings } from '../../types/sensors'
 
 export const BottomTimeline = memo(function BottomTimeline() {
-  const simTime = useStore((s) => s.simTime)
-  const wallClock = useStore((s) => s.wallClockTime)
+  const simTime             = useStore((s) => s.simTime)
+  const maxAvailableSimTime = useStore((s) => s.maxAvailableSimTime)
+  const wallClock           = useStore((s) => s.wallClockTime)
   const scenario = useStore((s) => s.scenarioName)
   const stage = useStore((s) => s.stage)
   const progress = useStore((s) => s.progressPercent)
@@ -109,7 +110,7 @@ export const BottomTimeline = memo(function BottomTimeline() {
           <input
             type="range"
             min={0}
-            max={Math.max(simTime, 1)}
+            max={Math.max(maxAvailableSimTime, 1)}
             step={5}
             value={scrubValue}
             onChange={handleSliderChange}
@@ -117,7 +118,7 @@ export const BottomTimeline = memo(function BottomTimeline() {
             aria-label="Historical time scrubber"
           />
           <span className="text-[10px] text-slate-400 flex-shrink-0 font-mono w-16 text-right">
-            {isLoading ? '…' : `T+${formatSimTime(Math.max(simTime, 1))}`}
+            {isLoading ? '…' : `T+${formatSimTime(Math.max(maxAvailableSimTime, 1))}`}
           </span>
         </div>
       )}

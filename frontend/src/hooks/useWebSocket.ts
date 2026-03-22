@@ -5,6 +5,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../store'
 import type { ServerMessage } from '../types/websocket'
 import type { TimelineSeverity } from '../types/timeline'
+import type { PlaybackMode } from '../store'
 
 const WS_URL = 'ws://localhost:8001/ws'
 
@@ -16,22 +17,39 @@ let _timelineId = 0
 const nextId = () => ++_timelineId
 
 export function useWebSocket(): void {
-  const wsRef              = useRef<WebSocket | null>(null)
-  const retryCountRef      = useRef(0)
-  const reconnectTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevHealthRef      = useRef<number>(100)
-  const prevStageRef       = useRef<string>('')
-  const cascadeEmittedRef  = useRef(false)
+  const wsRef                  = useRef<WebSocket | null>(null)
+  const retryCountRef          = useRef(0)
+  const reconnectTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevHealthRef          = useRef<number>(100)
+  const prevStageRef           = useRef<string>('')
+  const cascadeEmittedRef      = useRef(false)
+  // Ref-based mode: avoids making handleMessage/connect unstable on playback
+  // toggle. Previously mode was in handleMessage's useCallback dep array,
+  // which caused connect() to be recreated → useEffect re-ran → WebSocket
+  // tore down and reconnected on every LIVE/playback switch (the "refresh").
+  const modeRef                = useRef<PlaybackMode>('live')
+  // Intentional-close flag: prevents ws.onclose from scheduling a reconnect
+  // when the cleanup deliberately closes the socket (StrictMode double-invoke
+  // or component unmount). Without this, the stale connect closure captured
+  // in onclose would open a second parallel connection.
+  const isIntentionalCloseRef  = useRef(false)
 
-  const setConnectionStatus = useStore((s) => s.setConnectionStatus)
-  const updateReadings      = useStore((s) => s.updateReadings)
-  const updateHealth        = useStore((s) => s.updateHealth)
-  const addAlert            = useStore((s) => s.addAlert)
-  const updateScenario      = useStore((s) => s.updateScenario)
-  const setSpeedMultiplier  = useStore((s) => s.setSpeedMultiplier)
-  const setSimTime          = useStore((s) => s.setSimTime)
-  const addTimelineEvent    = useStore((s) => s.addTimelineEvent)
-  const mode                = useStore((s) => s.mode)
+  const setConnectionStatus    = useStore((s) => s.setConnectionStatus)
+  const updateReadings         = useStore((s) => s.updateReadings)
+  const updateHealth           = useStore((s) => s.updateHealth)
+  const addAlert               = useStore((s) => s.addAlert)
+  const updateScenario         = useStore((s) => s.updateScenario)
+  const setSpeedMultiplier     = useStore((s) => s.setSpeedMultiplier)
+  const setSimTime             = useStore((s) => s.setSimTime)
+  const setMaxAvailableSimTime = useStore((s) => s.setMaxAvailableSimTime)
+  const addTimelineEvent       = useStore((s) => s.addTimelineEvent)
+  // Read mode only to keep modeRef in sync — NOT included in handleMessage deps.
+  const mode                   = useStore((s) => s.mode)
+
+  // Keep modeRef current without making handleMessage/connect unstable.
+  useEffect(() => {
+    modeRef.current = mode
+  }, [mode])
 
   const handleMessage = useCallback(
     (msg: ServerMessage) => {
@@ -49,16 +67,20 @@ export function useWebSocket(): void {
           break
 
         case 'sensor_update':
+          // Always track the furthest-seen sim_time so the playback slider
+          // shows the full available history range even when live updates are
+          // suppressed in playback mode.
+          setMaxAvailableSimTime(msg.sim_time)
           // In playback mode, suppress live sensor/health updates so historical
           // state loaded by the slider remains visible.
-          if (mode === 'live') {
+          if (modeRef.current === 'live') {
             updateReadings(msg.group, msg.sensors, msg.sim_time, msg.timestamp)
             setSimTime(msg.sim_time, msg.timestamp)
           }
           break
 
         case 'health_update': {
-          if (mode === 'live') {
+          if (modeRef.current === 'live') {
             updateHealth(msg.overall_score, msg.previous_score, msg.components, msg.timestamp)
           }
           // Track significant health drops for the timeline (independent of playback mode)
@@ -146,12 +168,19 @@ export function useWebSocket(): void {
           break
       }
     },
-    [setSpeedMultiplier, setSimTime, updateReadings, updateHealth, addAlert, updateScenario, addTimelineEvent, mode],
+    // mode intentionally excluded — read via modeRef.current so this callback
+    // (and therefore connect) stays stable across playback mode toggles.
+    [setSpeedMultiplier, setSimTime, setMaxAvailableSimTime, updateReadings,
+     updateHealth, addAlert, updateScenario, addTimelineEvent],
   )
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+    // Block if already open OR still connecting — prevents a stale onclose
+    // closure from opening a duplicate socket while a new one is pending.
+    const rs = wsRef.current?.readyState
+    if (rs === WebSocket.OPEN || rs === WebSocket.CONNECTING) return
 
+    isIntentionalCloseRef.current = false
     setConnectionStatus('connecting')
     const ws = new WebSocket(WS_URL)
     wsRef.current = ws
@@ -171,6 +200,9 @@ export function useWebSocket(): void {
     }
 
     ws.onclose = () => {
+      // Intentional closes (effect cleanup / StrictMode teardown) must NOT
+      // trigger a reconnect — the caller handles starting a fresh connection.
+      if (isIntentionalCloseRef.current) return
       setConnectionStatus('disconnected')
       const delay = BACKOFF_DELAYS[Math.min(retryCountRef.current, BACKOFF_DELAYS.length - 1)]
       retryCountRef.current += 1
@@ -185,6 +217,8 @@ export function useWebSocket(): void {
   useEffect(() => {
     connect()
     return () => {
+      // Mark as intentional so ws.onclose skips the reconnect timer.
+      isIntentionalCloseRef.current = true
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       wsRef.current?.close()
     }

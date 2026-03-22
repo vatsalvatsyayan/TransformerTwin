@@ -1,7 +1,38 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 16 — Real Digital Twin: Model vs Reality, Operating Envelope, DGA Rates)
+> Last updated: 2026-03-21 (Session 17 — Bug fixes: WebSocket stability, compact health strip, layout height)
+
+---
+
+## Current Status: 🟢 Session 17 Complete — Critical Bug Fixes (Refresh + UI Stability)
+
+### Session 17 Additions (2026-03-21)
+
+**Context**: User reported the app "refreshes" and "can't click many buttons." A deep code analysis identified 5 root-cause bugs; all fixed.
+
+#### Bug Fix: WebSocket Reconnects on Every Playback Toggle (`useWebSocket.ts`)
+- **Root cause**: `mode` was in `handleMessage`'s `useCallback` dep array → `connect` was recreated → `useEffect([connect])` re-ran on every LIVE/playback switch, closing and reopening the WebSocket.
+- **Fix**: Replaced `const mode = useStore(...)` with a `modeRef` + a syncing `useEffect`. `modeRef.current` is read inside `handleMessage` at call time; `mode` no longer appears in the dep array. `handleMessage` and `connect` are now stable for the lifetime of the component.
+
+#### Bug Fix: StrictMode Double WebSocket Connections (`useWebSocket.ts`)
+- **Root cause**: React StrictMode's cleanup+re-run caused the `onclose` handler to fire and schedule a reconnect via a stale `connect_v1` closure. If the new `connect_v2` socket was still CONNECTING, `connect_v1` opened a third parallel connection — causing racing store writes.
+- **Fix**: Added `isIntentionalCloseRef` boolean. The cleanup sets it to `true` before calling `ws.close()`. The `onclose` handler returns immediately if the flag is set, skipping the reconnect timer. Also strengthened the guard from `readyState === OPEN` to `readyState === OPEN || readyState === CONNECTING`.
+
+#### Bug Fix: Compact Health Strip — ~142px → ~44px (`HealthBreakdown.tsx`, `TabContainer.tsx`)
+- **Root cause**: The always-visible HealthBreakdown had 6 rows × ~22px = ~132px + padding = ~142px. On a 14" MacBook Pro, this left only ~385px for tab content with a fault scenario active.
+- **Fix**: Added `compact` prop to `HealthBreakdown`. In compact mode, 6 components render as inline colored-dot chips (`flex-wrap` row) with hover/click behavior preserved. TabContainer now uses `<HealthBreakdown compact />` with a 44px gauge, total strip ~44px. Gain: ~100px more content area.
+
+#### Bug Fix: ScenarioProgressBar No Longer Causes Layout Shift (`ScenarioProgressBar.tsx`)
+- **Root cause**: The multi-line block (scenario name row + stage row + progress bar = ~90px) appeared suddenly when a fault scenario started, shifting all content down by 90px mid-interaction.
+- **Fix**: Rewritten as a compact single-line strip (~32px): "⚡ [Scenario Name] [mini-bar] [X%]". All info preserved. Layout shift eliminated. Total savings with health strip fix: ~160px more content area on smaller screens.
+
+#### Bug Fix: Playback Slider Max Froze When Entering Playback (`store/index.ts`, `useWebSocket.ts`, `BottomTimeline.tsx`)
+- **Root cause**: `simTime` is suppressed in playback mode (sensor_update messages ignored), so the slider `max` froze at the simTime when playback was entered.
+- **Fix**: Added `maxAvailableSimTime` to the store (always updated in both live and playback modes via a dedicated `setMaxAvailableSimTime` action). The playback slider now uses this value for its `max` attribute.
+
+#### Session 17 Log Entry
+| 2026-03-21 | 17 | Bug fixes: (1) WS mode-dep reconnect — modeRef breaks dep chain; (2) StrictMode double-connect — isIntentionalCloseRef + CONNECTING guard; (3) HealthBreakdown compact prop — 142px → 44px strip; (4) ScenarioProgressBar single-line — 90px → 32px; (5) maxAvailableSimTime for playback slider max. 28/28 backend + 125/125 frontend tests pass. Build clean. |
 
 ---
 

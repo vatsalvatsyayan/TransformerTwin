@@ -1,4 +1,6 @@
-// Horizontal stacked bar breakdown per health component — clickable rows drive 3D highlight
+// Health component breakdown — clickable rows/chips drive 3D highlight
+// compact=false (default): vertical bar list for detail views
+// compact=true: inline colored chips for the always-visible strip
 
 import { memo } from 'react'
 import { useStore } from '../../store'
@@ -14,7 +16,11 @@ const COMPONENT_LABELS: Record<string, string> = {
   bushing: 'Bushing',
 }
 
-export const HealthBreakdown = memo(function HealthBreakdown() {
+export interface HealthBreakdownProps {
+  compact?: boolean
+}
+
+export const HealthBreakdown = memo(function HealthBreakdown({ compact = false }: HealthBreakdownProps) {
   const components = useStore((s) => s.components)
   const selectedHealthComponent = useStore((s) => s.selectedHealthComponent)
   const setSelectedHealthComponent = useStore((s) => s.setSelectedHealthComponent)
@@ -24,6 +30,38 @@ export const HealthBreakdown = memo(function HealthBreakdown() {
     setSelectedHealthComponent(selectedHealthComponent === key ? null : key)
   }
 
+  // ── Compact mode: inline chips ──────────────────────────────────────────────
+  if (compact) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {Object.entries(components).map(([key, comp]) => {
+          if (!comp) return null
+          const color = STATUS_COLORS[comp.status as keyof typeof STATUS_COLORS] ?? STATUS_COLORS.NORMAL
+          const isSelected = selectedHealthComponent === key
+          return (
+            <button
+              key={key}
+              onClick={() => handleClick(key as HealthComponentKey)}
+              title={`${COMPONENT_LABELS[key] ?? key}: ${comp.status}. Click to highlight in 3D view.`}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                isSelected
+                  ? 'bg-sky-900/40 ring-1 ring-sky-500/60 text-sky-300'
+                  : 'hover:bg-[#1e2238] text-slate-400'
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: isSelected ? '#38bdf8' : color }}
+              />
+              {COMPONENT_LABELS[key] ?? key}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // ── Full mode: vertical bar list ────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-1.5 text-xs">
       {Object.entries(components).map(([key, comp]) => {

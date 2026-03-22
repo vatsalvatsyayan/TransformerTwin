@@ -100,16 +100,15 @@ export const TabContainer = memo(function TabContainer() {
         ))}
       </div>
 
-      {/* Health gauge + component breakdown — always visible above tab content */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b border-[#2d3148] bg-[#161927] flex-shrink-0">
-        <HealthGauge size={64} />
+      {/* Health gauge + compact component chips — always visible, fixed ~44px height */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#2d3148] bg-[#161927] flex-shrink-0">
+        <HealthGauge size={44} />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5">Health Components</p>
-          <HealthBreakdown />
+          <HealthBreakdown compact />
         </div>
       </div>
 
-      {/* Scenario progress — shown only during active fault simulations */}
+      {/* Scenario progress — compact single-line strip (Bug #4 fix: was ~90px multi-line) */}
       <ScenarioProgressBar />
 
       {/* Tab content */}
