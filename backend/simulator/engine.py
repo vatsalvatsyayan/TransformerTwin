@@ -499,6 +499,7 @@ class SimulatorEngine:
             tap_position=self.state.tap_position,
             tap_op_count=self.state.tap_op_count,
             cooling_mode_override=effective_cooling_override,
+            force_cooling_on=self._terminal_failure,
         )
         cooling_mode: str = equip["cooling_mode"]
 
@@ -637,16 +638,19 @@ class SimulatorEngine:
         # --- 10a. Scenario transition: emit equipment-specific startup alert ---
         current_scenario_id = self.scenario_manager.active_scenario.scenario_id
         if current_scenario_id != self._last_scenario_id:
+            # Clear terminal failure state on ANY scenario transition, not just → normal.
+            # This allows switching from thermal_runaway directly to any other scenario.
+            if self._terminal_failure:
+                self._terminal_failure = False
+                self._terminal_failure_emitted = False
+                for k in self._diag_offsets:
+                    self._diag_offsets[k] = 0.0
             if current_scenario_id != "normal":
                 await self._emit_scenario_start_alert(current_scenario_id, now_iso)
             else:
-                # Scenario transitioned back to normal — clear all failure state
+                # Transitioning to normal — also clear cascade/winding state
                 self._cascade_triggered = False
                 self._winding_critical_duration = 0.0
-                self._terminal_failure = False              # reset terminal flag
-                self._terminal_failure_emitted = False      # allow re-trigger
-                for k in self._diag_offsets:               # reset diagnostic offsets
-                    self._diag_offsets[k] = 0.0
                 # Emit one final scenario_update so the frontend receives
                 # terminal_failure=False / cascade_triggered=False and clears UI state.
                 await self._emit_scenario_update(now_iso)

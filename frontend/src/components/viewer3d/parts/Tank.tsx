@@ -85,6 +85,9 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
   // Health-driven emissive (used for selection highlight / health status overlay)
   const healthEmissive = useHealthColor('oil_temp')
 
+  // Terminal failure: protection relay operated — override thermal gradient with critical red
+  const terminalFailure = useStore((s) => s.terminalFailure)
+
   // Live temperature readings for gradient
   const botTemp = useStore((s) => s.readings['BOT_OIL_TEMP']?.value)
   const topTemp = useStore((s) => s.readings['TOP_OIL_TEMP']?.value)
@@ -104,9 +107,14 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
     const yCenter = -TANK_H / 2 + sliceH * (i + 0.5) // evenly spaced centres
     const tempEmissive = lerpEmissive(botColor, topColor, t)
 
-    // When health component is selected, the health emissive overrides temp gradient
+    // Priority: selection highlight (1.8) > terminal failure red > thermal gradient.
+    // Health status colors (CAUTION=0.35, WARNING=0.60, CRITICAL=0.90) do NOT override
+    // thermal gradient — it already encodes the same information visually.
+    const shutdownEmissive: EmissiveProps = { emissive: '#dc2626', emissiveIntensity: 0.90 }
     const resolvedEmissive =
-      healthEmissive.emissiveIntensity > 0 ? healthEmissive : tempEmissive
+      healthEmissive.emissiveIntensity >= 1.5 ? healthEmissive
+      : terminalFailure ? shutdownEmissive
+      : tempEmissive
 
     return { t, yCenter, ...resolvedEmissive }
   })
@@ -158,7 +166,7 @@ export const Tank = memo(function Tank({ onHover, onHoverEnd, onClick }: TankPro
       {([-0.7, 0, 0.7] as const).map((y) => {
         const t = (y + 1.4) / 2.8 // normalize to [0,1]
         const ribColor = lerpEmissive(botColor, topColor, t)
-        const resolved = healthEmissive.emissiveIntensity > 0 ? healthEmissive : ribColor
+        const resolved = healthEmissive.emissiveIntensity >= 1.5 ? healthEmissive : ribColor
         return (
           <TankSlice
             key={y}

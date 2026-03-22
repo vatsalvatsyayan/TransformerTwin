@@ -18,8 +18,8 @@ interface KpiTileProps {
 const KpiTile = memo(function KpiTile({ label, value, sub, color, pct }: KpiTileProps) {
   return (
     <div className="flex flex-col justify-center px-3 py-2 rounded border border-[#2d3148] bg-[#161927] min-w-[120px]">
-      <span className="text-[10px] text-slate-500 uppercase tracking-widest leading-tight mb-0.5">{label}</span>
-      <span className={`text-[15px] font-bold font-mono leading-tight ${color}`}>{value}</span>
+      <span className="text-[11px] text-slate-400 uppercase tracking-widest leading-tight mb-0.5">{label}</span>
+      <span className={`text-[17px] font-bold font-mono leading-tight ${color}`}>{value}</span>
       {pct !== undefined && (
         <div className="mt-1 h-1 bg-[#252840] rounded-full overflow-hidden">
           <div
@@ -30,7 +30,7 @@ const KpiTile = memo(function KpiTile({ label, value, sub, color, pct }: KpiTile
           />
         </div>
       )}
-      <span className="text-[10px] text-slate-600 leading-tight mt-0.5">{sub}</span>
+      <span className="text-[11px] text-slate-400 leading-tight mt-0.5">{sub}</span>
     </div>
   )
 })
@@ -106,15 +106,17 @@ export const AssetKPIBar = memo(function AssetKPIBar() {
 
       {/* ── Transformer Nameplate ────────────────────────────────── */}
       <div className="flex-shrink-0 border-r border-[#2d3148] pr-4">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-bold text-white font-mono">TRF-001</span>
+        {/* Machine ID — bold white, prominent */}
+        <div className="text-sm font-bold text-white font-mono mb-1">TRF-001</div>
+        {/* Spec badges */}
+        <div className="flex items-center gap-1.5 mb-1">
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 font-bold font-mono uppercase tracking-wide">100 MVA</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">230 / 69 kV</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">ONAN/ONAF/OFAF</span>
         </div>
-        <div className="text-[10px] text-slate-500 leading-tight">
-          GE Vernova · Substation Alpha, Bay 3 · S/N: GEV-2005-0847 · In service since 2005
-        </div>
+        {/* Metadata — split across two lines for readability */}
+        <div className="text-[10px] text-slate-500 leading-tight">GE Vernova · Substation Alpha, Bay 3</div>
+        <div className="text-[10px] text-slate-500 leading-tight">S/N: GEV-2005-0847 · In service since 2005</div>
       </div>
 
       {/* ── KPI Tiles ────────────────────────────────────────────── */}

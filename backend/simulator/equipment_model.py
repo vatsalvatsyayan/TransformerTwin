@@ -57,6 +57,7 @@ class EquipmentModel:
         tap_position: int,
         tap_op_count: int,
         cooling_mode_override: str | None = None,
+        force_cooling_on: bool = False,
     ) -> dict:
         """Compute updated equipment states from thermal inputs.
 
@@ -74,6 +75,9 @@ class EquipmentModel:
             tap_op_count: Cumulative tap operation count.
             cooling_mode_override: If set, force this cooling mode (used by
                 cooling_failure scenario to simulate fan failure).
+            force_cooling_on: If True, override hysteresis and keep all cooling
+                equipment ON (used during terminal failure — relay trip activates
+                emergency cooling to dissipate residual heat).
 
         Returns:
             Dict with keys: fan_bank_1, fan_bank_2, oil_pump_1,
@@ -116,6 +120,15 @@ class EquipmentModel:
         if new_tap != tap_position:
             tap_op_count += 1
             tap_position = new_tap
+
+        # --- Emergency cooling override (terminal failure — relay tripped) ---
+        # After a protective relay trip, cooling systems remain active to dissipate
+        # residual heat and prevent thermal shock to insulation.
+        if force_cooling_on:
+            fan_bank_1 = True
+            fan_bank_2 = True
+            oil_pump_1 = True
+            logger.debug("Emergency cooling ON (terminal failure)")
 
         # --- Determine cooling mode ---
         if cooling_mode_override is not None:

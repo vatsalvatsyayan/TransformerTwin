@@ -4,6 +4,8 @@
 
 import { memo } from 'react'
 import { useStore } from '../../store'
+import { api } from '../../lib/api'
+import type { ScenarioId } from '../../types/scenario'
 
 // Color tier thresholds by progress % (early → mid → late stage)
 function getTierClasses(pct: number): { text: string; bar: string; border: string; bg: string } {
@@ -38,6 +40,7 @@ export const ScenarioProgressBar = memo(function ScenarioProgressBar() {
   const progressPercent = useStore((s) => s.progressPercent)
   const cascadeTriggered = useStore((s) => s.cascadeTriggered)
   const terminalFailure = useStore((s) => s.terminalFailure)
+  const updateScenario  = useStore((s) => s.updateScenario)
 
   const isActive = activeScenario !== 'normal'
   if (!isActive && !cascadeTriggered && !terminalFailure) return null
@@ -48,10 +51,30 @@ export const ScenarioProgressBar = memo(function ScenarioProgressBar() {
     <div className="flex-shrink-0">
       {/* Terminal failure: permanent tripped state banner */}
       {terminalFailure && (
-        <div className="flex items-center gap-2 px-3 py-1 bg-black border-b border-red-600/80 animate-pulse">
-          <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">
-            ⚡ TRANSFORMER TRIPPED — PROTECTION RELAY OPERATED
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-black border-b border-red-600/80">
+          <span className="text-[11px] font-bold text-red-300 uppercase tracking-widest animate-pulse">
+            TRANSFORMER TRIPPED — PROTECTION RELAY OPERATED
           </span>
+          <button
+            onClick={() => {
+              void api.triggerScenario('normal').then(() => {
+                // Optimistically clear UI — WebSocket confirms on next tick
+                updateScenario({
+                  scenario_id: 'normal' as ScenarioId,
+                  name: 'Normal Operation',
+                  stage: '',
+                  progress_percent: 0,
+                  elapsed_sim_time: 0,
+                  cascade_triggered: false,
+                  terminal_failure: false,
+                })
+              })
+            }}
+            className="text-[10px] px-2 py-0.5 rounded border border-slate-600 bg-slate-800 text-slate-300
+                       hover:bg-slate-700 hover:text-white transition-colors flex-shrink-0"
+          >
+            Reset
+          </button>
         </div>
       )}
 

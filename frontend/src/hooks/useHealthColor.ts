@@ -13,10 +13,18 @@ export interface HealthColorResult {
 export function useHealthColor(key: HealthComponentKey): HealthColorResult {
   const status = useStore((s) => s.components[key]?.status ?? 'NORMAL')
   const isSelected = useStore((s) => s.selectedHealthComponent === key)
+  const terminalFailure = useStore((s) => s.terminalFailure)
 
   if (isSelected) {
     // Bright cyan pulse — visually distinct from all health status colors
     return { emissive: '#38bdf8', emissiveIntensity: 1.8 }
+  }
+
+  if (terminalFailure) {
+    // Protection relay operated — whole transformer offline.
+    // Show all parts in critical red regardless of individual health scores,
+    // since the relay trip is a system-wide failure event.
+    return { emissive: '#dc2626', emissiveIntensity: 0.90 }
   }
 
   switch (status) {

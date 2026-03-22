@@ -1,7 +1,70 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-22 (Session 22 — Thermal Runaway Cascade: COMPLETE)
+> Last updated: 2026-03-22 (Session 24 — Post-Thermal-Runaway UX: 6 Bug Fixes)
+
+---
+
+## Current Status: 🟢 Session 24 Complete — Post-Thermal-Runaway UX: Reset, Scenarios, 3D Model, Layout, Cooling
+
+### Session 24 Additions (2026-03-22)
+
+**Goal**: Fix 6 UX/functional issues found after thermal runaway scenario demo.
+
+**Status**: COMPLETE. 28/28 backend tests pass. 125/125 frontend tests pass.
+
+#### What was fixed:
+
+1. **Reset button now instantaneous** — `ScenarioProgressBar.tsx` now optimistically clears terminal failure state in the Zustand store immediately after the API call resolves, without waiting for the next WebSocket tick. No more lag.
+
+2. **Scenario selector no longer stuck after terminal failure** (two parts):
+   - Backend (`engine.py`): `_terminal_failure` flag is now cleared on ANY scenario transition, not just `→ normal`. Direct switch from thermal_runaway to hot_spot now works correctly.
+   - Frontend (`ScenarioSelector.tsx`): Added local optimistic state with `useState`/`useEffect` so the dropdown shows the selected scenario immediately instead of snapping back while waiting for WebSocket.
+
+3. **3D model shows all parts critical red during terminal failure** — when `terminalFailure=true`:
+   - `useHealthColor.ts`: returns `{ emissive: '#dc2626', emissiveIntensity: 0.90 }` for all health-driven parts (bushings, tap changer, buchholz relay, conservator, oil pump, radiator bank).
+   - `Tank.tsx`: overrides thermal gradient with critical red when `terminalFailure=true`, making the whole transformer glow red system-wide.
+
+4. **AssetKPIBar nameplate is now multi-line** — TRF-001 is bold white on its own line, followed by spec badges (100 MVA / 230 kV / ONAN), then metadata split across two lines (location + serial/year). Previously all crammed onto 2 lines.
+
+5. **Fans and oil pump stay ON after relay trip** — `equipment_model.py` gained a `force_cooling_on: bool = False` parameter. When `True`, overrides hysteresis and keeps all cooling equipment running (emergency post-trip cooling). `engine.py` passes `force_cooling_on=self._terminal_failure`.
+
+6. **"Parts change colors when normal"** — confirmed as expected behavior: health components fluctuate as simulator runs. Fixes 2–3 above (consistent terminal failure state + all-red during trip) eliminate the confusing mixed-color state.
+
+#### Files changed:
+- `frontend/src/components/common/ScenarioProgressBar.tsx` (Fix 1)
+- `frontend/src/components/common/ScenarioSelector.tsx` (Fix 2b)
+- `backend/simulator/engine.py` (Fix 2a + Fix 5 caller)
+- `frontend/src/hooks/useHealthColor.ts` (Fix 3a)
+- `frontend/src/components/viewer3d/parts/Tank.tsx` (Fix 3b)
+- `frontend/src/components/layout/AssetKPIBar.tsx` (Fix 4)
+- `backend/simulator/equipment_model.py` (Fix 5 implementation)
+
+---
+
+## Current Status: 🟢 Session 23 Complete — UI Polish: Terminal Failure UX, Tank Color, KPI Bar Readability, Scenario Label
+
+### Session 23 Additions (2026-03-22)
+
+**Goal**: Fix 4 UX issues identified post-Session-22.
+
+**Status**: COMPLETE. 125/125 frontend tests pass.
+
+#### What was changed:
+
+1. **Terminal failure no longer blocks the full UI** — Removed `TerminalFailureOverlay` (full-screen `z-50` overlay). Terminal failure state is now shown as an in-band banner in `ScenarioProgressBar` with an inline "Reset" button. Normal UI remains visible throughout the cascade and after trip.
+   - Deleted: `frontend/src/components/panels/TerminalFailureOverlay.tsx`
+   - Updated: `frontend/src/App.tsx` (removed import + render)
+   - Updated: `frontend/src/components/common/ScenarioProgressBar.tsx` (added Reset button + api import)
+
+2. **Transformer tank thermal gradient no longer overridden by health status colors** — `Tank.tsx` now only applies health emissive (cyan, intensity=1.8) when a health component is **selected** (clicked), not for CAUTION/WARNING/CRITICAL status. Threshold changed from `> 0` to `>= 1.5`. Thermal gradient is the primary visual.
+   - Updated: `frontend/src/components/viewer3d/parts/Tank.tsx` (2 condition fixes)
+
+3. **AssetKPIBar text is more readable** — Label font: `text-[10px] text-slate-500` → `text-[11px] text-slate-400`. Value font: `text-[15px]` → `text-[17px]`. Sub text: `text-[10px] text-slate-600` → `text-[11px] text-slate-400`.
+   - Updated: `frontend/src/components/layout/AssetKPIBar.tsx`
+
+4. **Scenario dropdown aligned** — Removed `⚡` emoji from "Thermal Runaway — Full Cascade" label so it aligns with other plain-text options.
+   - Updated: `frontend/src/components/common/ScenarioSelector.tsx`
 
 ---
 
