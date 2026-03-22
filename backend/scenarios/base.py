@@ -63,6 +63,27 @@ class BaseScenario(ABC):
             Dict mapping sensor ID (DGA_*) to rate multiplier (1.0 = normal).
         """
 
+    def get_diagnostic_modifiers(self) -> dict[str, float]:
+        """Return additive offsets for diagnostic sensors. Default: no effect.
+
+        Keys: "OIL_DIELECTRIC", "OIL_MOISTURE", "BUSHING_CAP_HV", "BUSHING_CAP_LV"
+        Values: signed float offset from nominal (e.g. -8.0 lowers dielectric by 8 kV/mm).
+
+        Returns:
+            Empty dict (no diagnostic modification) by default.
+        """
+        return {}
+
+    def is_terminal_failure(self) -> bool:
+        """Return True when scenario is in terminal failure state (Stage 6).
+
+        When True, engine forces load_current to 0 and emits terminal alert.
+
+        Returns:
+            False for all base scenarios.
+        """
+        return False
+
     def advance(self, delta_sim_s: float) -> None:
         """Advance scenario clock by delta_sim_s seconds.
 

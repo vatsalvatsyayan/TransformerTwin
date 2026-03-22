@@ -105,7 +105,7 @@ type CoolingMode = "ONAN" | "ONAF" | "OFAF";
 ### 1.5 Scenario IDs
 
 ```typescript
-type ScenarioId = "normal" | "hot_spot" | "arcing" | "cooling_failure";
+type ScenarioId = "normal" | "hot_spot" | "arcing" | "cooling_failure" | "partial_discharge" | "paper_degradation" | "thermal_runaway";
 ```
 
 ### 1.6 Duval Triangle Zones
@@ -382,6 +382,7 @@ Sent on every thermal tick (every 5 sim-seconds) while a non-`normal` scenario i
 | progress_percent | number | 0.0–100.0. Computed as `elapsed_sim_time / total_duration_sim_s × 100`. |
 | elapsed_sim_time | number | Seconds since scenario was triggered |
 | total_duration_sim_s | number | Total scenario duration in sim-seconds (fixed per scenario, see table below) |
+| terminal_failure | boolean | True when Stage 6 (relay trip) is active (thermal_runaway only). Frontend shows TerminalFailureOverlay. Resets to false when scenario transitions to normal. Default: false. |
 
 **Scenario durations (sim-seconds). Used by frontend for progress bar and ETA display:**
 
@@ -390,6 +391,9 @@ Sent on every thermal tick (every 5 sim-seconds) while a non-`normal` scenario i
 | `hot_spot` | 7200 | 2 hours |
 | `arcing` | 900 | 15 minutes |
 | `cooling_failure` | 3600 | 1 hour |
+| `partial_discharge` | 7200 | 2 hours |
+| `paper_degradation` | 10800 | 3 hours |
+| `thermal_runaway` | 9000 | 2h 30min (45s @200×) |
 | `normal` | — | Does not send `scenario_update` |
 
 ---

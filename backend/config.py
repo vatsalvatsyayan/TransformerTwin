@@ -242,6 +242,7 @@ SCENARIO_ARCING: str = "arcing"
 SCENARIO_COOLING_FAILURE: str = "cooling_failure"
 SCENARIO_PARTIAL_DISCHARGE: str = "partial_discharge"
 SCENARIO_PAPER_DEGRADATION: str = "paper_degradation"
+SCENARIO_THERMAL_RUNAWAY: str = "thermal_runaway"
 
 VALID_SCENARIO_IDS: tuple[str, ...] = (
     SCENARIO_NORMAL,
@@ -250,6 +251,7 @@ VALID_SCENARIO_IDS: tuple[str, ...] = (
     SCENARIO_COOLING_FAILURE,
     SCENARIO_PARTIAL_DISCHARGE,
     SCENARIO_PAPER_DEGRADATION,
+    SCENARIO_THERMAL_RUNAWAY,
 )
 
 # Scenario durations in simulation seconds
@@ -260,6 +262,19 @@ SCENARIO_COOLING_FAILURE_DURATION_S: int = 3600  # 1 sim-hour
 SCENARIO_PARTIAL_DISCHARGE_DURATION_S: int = 7200
 # Paper degradation: long 3 sim-hour arc of CO/CO2 imbalance
 SCENARIO_PAPER_DEGRADATION_DURATION_S: int = 10800
+
+# --- Thermal Runaway Cascade scenario ---
+# Six-stage cascade total duration: 9000 sim-seconds
+# At 200× speed: 45 real seconds; at 30× speed: ~5 minutes
+SCENARIO_THERMAL_RUNAWAY_DURATION_S: int = 9000  # Total sim-seconds for full cascade
+
+# Stage boundaries (seconds elapsed in scenario)
+THERMAL_RUNAWAY_STAGE_1_END_S: float = 1500.0   # Cooling failure ends, hot spot begins
+THERMAL_RUNAWAY_STAGE_2_END_S: float = 3000.0   # Hot spot peak, oil degradation begins
+THERMAL_RUNAWAY_STAGE_3_END_S: float = 4800.0   # Oil degraded, PD begins
+THERMAL_RUNAWAY_STAGE_4_END_S: float = 6600.0   # PD established, arcing begins
+THERMAL_RUNAWAY_STAGE_5_END_S: float = 8100.0   # Arcing peak, terminal failure
+# Stage 6: 8100–9000 (terminal failure)
 
 # ---------------------------------------------------------------------------
 # FMEA failure mode IDs (Integration Contract Section 1.7)

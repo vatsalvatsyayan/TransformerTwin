@@ -9,6 +9,7 @@ import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore } from './store'
 import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA, fetchDecision, fetchOperatorStatus, fetchPrognostics } from './hooks/useApi'
+import { TerminalFailureOverlay } from './components/panels/TerminalFailureOverlay'
 
 export default function App() {
   // Establish WebSocket connection (reconnects automatically)
@@ -16,6 +17,7 @@ export default function App() {
 
   const connectionStatus = useStore((s) => s.connectionStatus)
   const hasData = useStore((s) => Object.keys(s.readings).length > 0)
+  const terminalFailure = useStore((s) => s.terminalFailure)
 
   // Fetch initial REST data on mount — errors are logged but not fatal
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function App() {
       )}
 
       <BottomTimeline />
+      {terminalFailure && <TerminalFailureOverlay />}
     </div>
   )
 }

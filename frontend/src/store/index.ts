@@ -51,6 +51,8 @@ export interface AppState {
   // Cascade: thermal→arcing escalation state (from scenario_update WS message)
   cascadeTriggered: boolean
   thermalFatigueScore: number
+  // Terminal failure: protection relay operated — transformer offline
+  terminalFailure: boolean
 
   // --- Connection ---
   connectionStatus: ConnectionState
@@ -107,6 +109,7 @@ export interface AppState {
     elapsed_sim_time: number
     cascade_triggered?: boolean
     thermal_fatigue_score?: number
+    terminal_failure?: boolean
   }) => void
   setConnectionStatus: (status: ConnectionState) => void
   setSpeedMultiplier: (speed: number) => void
@@ -149,6 +152,7 @@ export const useStore = create<AppState>()((set) => ({
   elapsedSimTime: 0,
   cascadeTriggered: false,
   thermalFatigueScore: 0,
+  terminalFailure: false,
   connectionStatus: 'disconnected',
   speedMultiplier: 1,
   simTime: 0,
@@ -245,6 +249,7 @@ export const useStore = create<AppState>()((set) => ({
       elapsedSimTime: p.elapsed_sim_time,
       cascadeTriggered: p.cascade_triggered ?? false,
       thermalFatigueScore: p.thermal_fatigue_score ?? 0,
+      terminalFailure: p.terminal_failure ?? false,
     }),
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),

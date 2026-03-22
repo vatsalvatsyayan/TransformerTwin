@@ -35,6 +35,20 @@
 
 ---
 
+## ADR-030: Terminal Failure as Non-Resettable Engine State (Session 22)
+- **Date**: 2026-03-22
+- **Context**: All existing scenarios auto-reset to `normal` when `is_complete()` returns True. The `thermal_runaway` scenario requires a permanent tripped state — the transformer is offline and cannot resume without explicit operator action.
+- **Decision**: Add `_terminal_failure` boolean to the engine. When True: (1) scenario completion block is skipped, (2) `load_fraction` is overridden to 0.0, (3) `scenario_update` carries `terminal_failure: true`, (4) one-time CRITICAL alert is emitted. State clears only when user explicitly triggers `normal` scenario.
+- **Rationale**: This mirrors real-world transformer protection: once a differential relay operates, the breaker remains open until engineering sign-off. The operator must consciously decide to re-energise.
+- **Alternatives rejected**: Auto-reset after 30s in terminal state (removes drama and educational value); New `tripped` scenario ID (overkill — just a flag).
+
+## ADR-031: Diagnostic Sensor Physics via Stage-Based Offsets (Session 22)
+- **Date**: 2026-03-22
+- **Context**: No existing scenario modified OIL_DIELECTRIC or OIL_MOISTURE. The thermal_runaway scenario requires these sensors to degrade realistically to drive FMEA evidence and demonstrate the oil/paper deterioration stage.
+- **Decision**: Add `get_diagnostic_modifiers()` to `BaseScenario` (default returns `{}`). In engine, maintain `_diag_offsets` dict. Each tick, the active scenario's diagnostic offsets are applied as fixed additive offsets from nominal (not accumulated). Stage-based: a scenario being in Stage 3 sets OIL_DIELECTRIC to nominal-8 regardless of how long it's been in Stage 3.
+- **Rationale**: Diagnostics degrade progressively with stage advancement but don't need precise accumulation — the physical degradation happens over the whole stage. Fixed offsets per stage are simpler, more predictable, and sufficient for the demo. OIL_DIELECTRIC clamped at 10 kV/mm (catastrophic failure floor); OIL_MOISTURE clamped at 60 ppm (saturation ceiling).
+- **Trade-off**: Diagnostic sensors will jump discretely at stage boundaries rather than transitioning smoothly. Acceptable since diagnostic updates are only sent every 3600 sim-seconds (1 sim-hour), so the jump is often not visible in normal demo pacing.
+
 ## ADR-001: Python FastAPI for Backend
 - **Date**: Pre-implementation
 - **Context**: Needed real-time WebSocket streaming with numerical computation for sensor simulation and anomaly detection.

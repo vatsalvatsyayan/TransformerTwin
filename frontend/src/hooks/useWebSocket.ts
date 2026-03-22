@@ -122,6 +122,7 @@ export function useWebSocket(): void {
           // If scenario is back to normal, cascade is definitionally inactive —
           // guard against a stale cascade_triggered=true from the final transition tick.
           const rawCascade = (msg as { cascade_triggered?: boolean }).cascade_triggered ?? false
+          const terminalNow = (msg as { terminal_failure?: boolean }).terminal_failure ?? false
           const cascadeNow = msg.scenario_id === 'normal' ? false : rawCascade
           updateScenario({
             scenario_id: msg.scenario_id,
@@ -131,6 +132,7 @@ export function useWebSocket(): void {
             elapsed_sim_time: msg.elapsed_sim_time,
             cascade_triggered: cascadeNow,
             thermal_fatigue_score: (msg as { thermal_fatigue_score?: number }).thermal_fatigue_score,
+            terminal_failure: terminalNow,
           })
 
           // Emit timeline event on stage changes

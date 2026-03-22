@@ -50,7 +50,7 @@ AlertSource = Literal["ANOMALY_ENGINE", "FMEA_ENGINE", "THRESHOLD"]
 
 CoolingMode = Literal["ONAN", "ONAF", "OFAF"]
 
-ScenarioId = Literal["normal", "hot_spot", "arcing", "cooling_failure", "partial_discharge", "paper_degradation"]
+ScenarioId = Literal["normal", "hot_spot", "arcing", "cooling_failure", "partial_discharge", "paper_degradation", "thermal_runaway"]
 
 DuvalZone = Literal["PD", "T1", "T2", "T3", "D1", "D2", "DT", "NONE"]
 
@@ -463,6 +463,7 @@ class WSScenarioUpdateSchema(BaseModel):
     stage: str
     progress_percent: float
     elapsed_sim_time: float
+    terminal_failure: bool = False   # True when Stage 6 (relay trip) is active
 
 
 class WSPingSchema(BaseModel):

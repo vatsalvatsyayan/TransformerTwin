@@ -1,7 +1,100 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-22 (Session 21 — UI readability + dynamic economics + clickable alerts + specific risk steps)
+> Last updated: 2026-03-22 (Session 22 — Thermal Runaway Cascade: COMPLETE)
+
+---
+
+## Current Status: 🟢 Session 22 Complete — Thermal Runaway Cascade: 6-Stage Failure to Terminal Relay Trip
+
+### Session 22 Additions (2026-03-22)
+
+**Goal**: Implement `thermal_runaway` — a 6-stage cascading failure scenario that chains cooling failure → hot spot → oil/paper deterioration → partial discharge → arcing → terminal relay trip. The transformer actually "dies" (protection relay operates, LOAD_CURRENT → 0, overlay shown).
+
+**Status**: COMPLETE. 28/28 backend tests pass. 125/125 frontend tests pass. TypeScript build clean.
+
+#### What was implemented:
+
+1. **`backend/scenarios/thermal_runaway.py`** (NEW) — 6-stage `ThermalRunawayScenario` class with thermal modifiers, DGA injection rates, and diagnostic offsets per stage. At 200× = 45 real seconds.
+2. **`backend/scenarios/base.py`** — Added `get_diagnostic_modifiers()` + `is_terminal_failure()` with default no-op implementations. Fully backwards compatible.
+3. **`backend/models/schemas.py`** — Added `"thermal_runaway"` to `ScenarioId`; added `terminal_failure: bool = False` to `WSScenarioUpdateSchema`.
+4. **`backend/simulator/engine.py`** — Terminal failure state machine: `_terminal_failure` flag, `_terminal_failure_emitted` gate, `_diag_offsets` dict for diagnostic sensor physics, `_emit_terminal_failure_alert()`, stage 6 load=0 override, clean reset on scenario→normal.
+5. **`backend/scenarios/manager.py`** — Registered `ThermalRunawayScenario`.
+6. **`backend/config.py`** — Added `SCENARIO_THERMAL_RUNAWAY_DURATION_S`, stage boundary constants, `SCENARIO_THERMAL_RUNAWAY` ID constant.
+7. **`frontend/src/types/scenario.ts`** — Added `'thermal_runaway'` to `ScenarioId`.
+8. **`frontend/src/store/index.ts`** — Added `terminalFailure: boolean` state + extraction in `updateScenario`.
+9. **`frontend/src/hooks/useWebSocket.ts`** — Extracts `terminal_failure` from `scenario_update` WS message.
+10. **`frontend/src/components/common/ScenarioSelector.tsx`** — Added `⚡ Thermal Runaway — Full Cascade` option.
+11. **`frontend/src/components/common/ScenarioProgressBar.tsx`** — Terminal failure pulse banner when `terminalFailure === true`.
+12. **`frontend/src/components/panels/TerminalFailureOverlay.tsx`** (NEW) — Full-screen overlay: "⚡ PROTECTION RELAY OPERATED", fault chain timeline, reset button.
+13. **`frontend/src/App.tsx`** — Renders `TerminalFailureOverlay` when `terminalFailure === true`.
+14. **`docs/INTEGRATION_CONTRACT.md`** — Added `thermal_runaway` to `ScenarioId`; added `terminal_failure` field to `scenario_update` schema.
+15. **`docs/DECISIONS.md`** — ADR-030 (terminal failure state machine), ADR-031 (diagnostic offsets).
+
+#### Physics stages:
+| Stage | Sim-time | @200× | Signal |
+|-------|----------|-------|--------|
+| 1 | 0–1500s | 0–7.5s | Fans seized, ONAN only, oil heating |
+| 2 | 1500–3000s | 7.5–15s | Winding +35°C, early DGA CO/H2 |
+| 3 | 3000–4800s | 15–24s | OIL_DIELECTRIC -8kV, OIL_MOISTURE +12ppm, CO rising |
+| 4 | 4800–6600s | 24–33s | H2/CH4 dominant → Duval PD zone |
+| 5 | 6600–8100s | 33–40.5s | C2H2 spike → Duval D1/D2, bushing drift |
+| 6 | 8100–9000s | 40.5–45s | LOAD_CURRENT=0, relay trip, TerminalFailureOverlay appears |
+
+---
+
+### Session 22 Plan (2026-03-22) — ARCHIVED
+
+**Goal**: Implement `thermal_runaway` — a 6-stage cascading failure scenario that chains cooling failure → hot spot → oil/paper deterioration → partial discharge → arcing → terminal relay trip. The transformer actually "dies" (protection relay operates, LOAD_CURRENT → 0, overlay shown).
+
+**Full implementation plan**: See [`docs/CASCADE_FAILURE_PLAN.md`](CASCADE_FAILURE_PLAN.md)
+
+#### What's New (not in any existing scenario):
+1. **6-stage multi-system cascade** — spans FM-001, FM-002, FM-003, FM-004, FM-006 across a single scenario
+2. **Diagnostic sensor physics** — OIL_DIELECTRIC falls, OIL_MOISTURE rises (novel: no existing scenario modifies diagnostics)
+3. **Terminal failure state** — engine `_terminal_failure` flag; scenario does NOT auto-reset; LOAD_CURRENT → 0
+4. **TerminalFailureOverlay.tsx** — dramatic full-screen overlay: "PROTECTION RELAY OPERATED — TRANSFORMER TRIPPED"
+5. **`get_diagnostic_modifiers()`** + **`is_terminal_failure()`** added to `BaseScenario` (default no-ops, backwards compatible)
+
+#### Physics Rationale:
+```
+Fan seizure → ONAN cooling → oil can't remove heat → winding hot spot
+→ Arrhenius-accelerated cellulose pyrolysis → CO/CO₂ + moisture
+→ wet degraded oil → void PD discharges → H₂/CH₄
+→ PD tracks across paper → arc channel → C₂H₂ spike
+→ inter-winding short → differential relay → breaker trip
+```
+
+#### Stage Timeline (@200× speed):
+| Stage | Sim-time | Real-time | Name |
+|-------|----------|-----------|------|
+| 1 | 0–1500s | 0–7.5s | Cooling System Failure |
+| 2 | 1500–3000s | 7.5–15s | Hot Spot Formation |
+| 3 | 3000–4800s | 15–24s | Oil & Paper Deterioration |
+| 4 | 4800–6600s | 24–33s | Partial Discharge |
+| 5 | 6600–8100s | 33–40.5s | Arc Development |
+| 6 | 8100–9000s | 40.5–45s | **Terminal Failure** |
+
+#### Files to Create:
+- `backend/scenarios/thermal_runaway.py` (new scenario class)
+- `frontend/src/components/panels/TerminalFailureOverlay.tsx` (new UI overlay)
+
+#### Files to Modify:
+- `backend/scenarios/base.py` — add `get_diagnostic_modifiers()` + `is_terminal_failure()` (default no-ops)
+- `backend/models/schemas.py` — add `"thermal_runaway"` to `ScenarioId`, `terminal_failure` to `WSScenarioUpdateSchema`
+- `backend/simulator/engine.py` — terminal failure state machine + diagnostic offset application + `_emit_terminal_failure_alert()`
+- `backend/scenarios/manager.py` — register `ThermalRunawayScenario`
+- `backend/config.py` — add `SCENARIO_THERMAL_RUNAWAY_DURATION_S` + stage boundary constants
+- `frontend/src/types/scenario.ts` — add `thermal_runaway`
+- `frontend/src/store/index.ts` — add `terminalFailure: boolean`
+- `frontend/src/hooks/useWebSocket.ts` — handle `terminal_failure` in `scenario_update`
+- `frontend/src/components/common/ScenarioSelector.tsx` — add scenario card (red DANGER styling)
+- `frontend/src/components/common/ScenarioProgressBar.tsx` — terminal failure banner
+- `frontend/src/App.tsx` — render `TerminalFailureOverlay`
+- `docs/INTEGRATION_CONTRACT.md` — document new `terminal_failure` field
+
+#### Session 22 Log Entry
+| 2026-03-22 | 22 | Designed and planned thermal_runaway cascading failure scenario. Implementation plan in docs/CASCADE_FAILURE_PLAN.md. |
 
 ---
 

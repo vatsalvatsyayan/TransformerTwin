@@ -1,6 +1,6 @@
 // Scenario types — Integration Contract Section 1.5 and 3.11–3.12
 
-export type ScenarioId = 'normal' | 'hot_spot' | 'arcing' | 'cooling_failure' | 'partial_discharge' | 'paper_degradation'
+export type ScenarioId = 'normal' | 'hot_spot' | 'arcing' | 'cooling_failure' | 'partial_discharge' | 'paper_degradation' | 'thermal_runaway'
 
 export interface ScenarioTriggerResponse {
   scenario_id: ScenarioId

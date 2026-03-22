@@ -37,14 +37,24 @@ export const ScenarioProgressBar = memo(function ScenarioProgressBar() {
   const stage           = useStore((s) => s.stage)
   const progressPercent = useStore((s) => s.progressPercent)
   const cascadeTriggered = useStore((s) => s.cascadeTriggered)
+  const terminalFailure = useStore((s) => s.terminalFailure)
 
   const isActive = activeScenario !== 'normal'
-  if (!isActive && !cascadeTriggered) return null
+  if (!isActive && !cascadeTriggered && !terminalFailure) return null
 
   const tier = getTierClasses(progressPercent)
 
   return (
     <div className="flex-shrink-0">
+      {/* Terminal failure: permanent tripped state banner */}
+      {terminalFailure && (
+        <div className="flex items-center gap-2 px-3 py-1 bg-black border-b border-red-600/80 animate-pulse">
+          <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">
+            ⚡ TRANSFORMER TRIPPED — PROTECTION RELAY OPERATED
+          </span>
+        </div>
+      )}
+
       {/* Cascade emergency: single compact line */}
       {cascadeTriggered && (
         <div className="flex items-center gap-2 px-3 py-1 bg-red-950/80 border-b border-red-700/60">

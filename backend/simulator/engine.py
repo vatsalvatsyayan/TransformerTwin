@@ -292,6 +292,20 @@ class SimulatorEngine:
         # True once the cascade has triggered (to emit the alert exactly once).
         self._cascade_triggered: bool = False
 
+        # --- Terminal Failure state (thermal_runaway scenario only) ---
+        # When True, the transformer is tripped — load forced to 0.
+        # Clears only when user explicitly triggers 'normal' scenario.
+        self._terminal_failure: bool = False
+        self._terminal_failure_emitted: bool = False  # Gate: emit alert exactly once
+
+        # Diagnostic sensor cumulative offsets (reset when scenario returns to normal)
+        self._diag_offsets: dict[str, float] = {
+            "OIL_DIELECTRIC": 0.0,
+            "OIL_MOISTURE":   0.0,
+            "BUSHING_CAP_HV": 0.0,
+            "BUSHING_CAP_LV": 0.0,
+        }
+
         # --- Thermal Fatigue tracking ---
         # Accumulates degree-hours of winding temp above FATIGUE_ONSET_THRESHOLD_C.
         # Represents irreversible insulation aging. Persists across scenario boundaries.
@@ -455,6 +469,7 @@ class SimulatorEngine:
         scenario = self.scenario_manager.active_scenario
         thermal_mods = scenario.get_thermal_modifiers()
         dga_mods = scenario.get_dga_modifiers()
+        diag_mods = scenario.get_diagnostic_modifiers()   # NEW: diagnostic sensor offsets
         winding_delta: float = thermal_mods.get("winding_delta", 0.0)
         top_oil_delta: float = thermal_mods.get("top_oil_delta", 0.0)
         cooling_override: str | None = thermal_mods.get("cooling_mode_override", None)
@@ -464,7 +479,9 @@ class SimulatorEngine:
         # This means "70% Load" will reduce load when the profile is above 70%, but will NOT
         # artificially increase load when the natural profile is already below 70%.
         natural_load = get_load_fraction(self.sim_time)
-        if self.operator_load_override is not None:
+        if self._terminal_failure:
+            load_fraction = 0.0          # Breaker opened — no current
+        elif self.operator_load_override is not None:
             load_fraction = min(self.operator_load_override, natural_load)
         else:
             load_fraction = natural_load
@@ -565,15 +582,46 @@ class SimulatorEngine:
         self.state.tap_position = equip["tap_position"]
         self.state.tap_op_count = equip["tap_op_count"]
 
-        # Diagnostic sensors — slow drift with noise (no physics model yet)
-        self.state.oil_moisture = add_noise("OIL_MOISTURE", _DIAG_NOMINALS["OIL_MOISTURE"])
-        self.state.oil_dielectric = add_noise("OIL_DIELECTRIC", _DIAG_NOMINALS["OIL_DIELECTRIC"])
-        self.state.bushing_cap_hv = add_noise("BUSHING_CAP_HV", _DIAG_NOMINALS["BUSHING_CAP_HV"])
-        self.state.bushing_cap_lv = add_noise("BUSHING_CAP_LV", _DIAG_NOMINALS["BUSHING_CAP_LV"])
+        # Apply diagnostic scenario modifiers (stage-based fixed offset, not accumulation)
+        if scenario.scenario_id != "normal":
+            for k, v in diag_mods.items():
+                if k in self._diag_offsets:
+                    self._diag_offsets[k] = v
+        else:
+            # Reset diagnostic offsets to zero when normal operation resumes
+            for k in self._diag_offsets:
+                self._diag_offsets[k] = 0.0
+
+        # Diagnostic sensors — slow drift + scenario offset + noise
+        # OIL_DIELECTRIC degrades (lower is worse); clamp at 10 kV/mm (catastrophic failure)
+        # OIL_MOISTURE rises (higher is worse); clamp at 60 ppm (saturation)
+        self.state.oil_moisture = min(
+            60.0,
+            add_noise("OIL_MOISTURE", _DIAG_NOMINALS["OIL_MOISTURE"] + self._diag_offsets["OIL_MOISTURE"])
+        )
+        self.state.oil_dielectric = max(
+            10.0,
+            add_noise("OIL_DIELECTRIC", _DIAG_NOMINALS["OIL_DIELECTRIC"] + self._diag_offsets["OIL_DIELECTRIC"])
+        )
+        self.state.bushing_cap_hv = add_noise(
+            "BUSHING_CAP_HV", _DIAG_NOMINALS["BUSHING_CAP_HV"] + self._diag_offsets["BUSHING_CAP_HV"]
+        )
+        self.state.bushing_cap_lv = add_noise(
+            "BUSHING_CAP_LV", _DIAG_NOMINALS["BUSHING_CAP_LV"] + self._diag_offsets["BUSHING_CAP_LV"]
+        )
 
         # --- 8. Advance scenario ---
         self.scenario_manager.advance(dt_s)
-        if self.scenario_manager.is_complete():
+
+        # Terminal failure: scenario runs to completion but does NOT reset to normal.
+        # Instead, the engine freezes in the tripped state until user manually resets.
+        if scenario.is_terminal_failure() and not self._terminal_failure:
+            self._terminal_failure = True
+            logger.warning("Terminal failure entered: %s", scenario.scenario_id)
+
+        # Do NOT auto-reset a terminal failure scenario to normal.
+        # Only reset non-terminal completed scenarios.
+        if self.scenario_manager.is_complete() and not self._terminal_failure:
             logger.info(
                 "Scenario '%s' complete — reverting to normal.",
                 scenario.scenario_id,
@@ -592,13 +640,15 @@ class SimulatorEngine:
             if current_scenario_id != "normal":
                 await self._emit_scenario_start_alert(current_scenario_id, now_iso)
             else:
-                # Scenario transitioned back to normal — immediately clear cascade so
-                # the frontend banner and risk escalation are removed without waiting
-                # for the _winding_critical_duration decay timer (~10 real minutes).
+                # Scenario transitioned back to normal — clear all failure state
                 self._cascade_triggered = False
                 self._winding_critical_duration = 0.0
+                self._terminal_failure = False              # reset terminal flag
+                self._terminal_failure_emitted = False      # allow re-trigger
+                for k in self._diag_offsets:               # reset diagnostic offsets
+                    self._diag_offsets[k] = 0.0
                 # Emit one final scenario_update so the frontend receives
-                # cascade_triggered=False and clears the cascade UI state.
+                # terminal_failure=False / cascade_triggered=False and clears UI state.
                 await self._emit_scenario_update(now_iso)
             self._last_scenario_id = current_scenario_id
 
@@ -676,6 +726,11 @@ class SimulatorEngine:
         # Reset cascade flag when scenario ends (so it can re-trigger on next fault)
         if not active_fault and self._winding_critical_duration < CASCADE_ARCING_TRIGGER_S:
             self._cascade_triggered = False
+
+        # --- 10c. Terminal failure alert: emit once when Stage 6 first entered ---
+        if self._terminal_failure and not self._terminal_failure_emitted:
+            self._terminal_failure_emitted = True
+            await self._emit_terminal_failure_alert(now_iso)
 
         # --- 11. FMEA + Health score on every thermal tick ---
         if thermal_due:
@@ -1007,6 +1062,25 @@ class SimulatorEngine:
                     "Calculate remaining insulation life using DP (degree of polymerization) test",
                 ],
             },
+            "thermal_runaway": {
+                "severity": "CRITICAL",
+                "title": "EQUIPMENT ALARM: Cooling Fan Seizure — Thermal Runaway Initiated",
+                "description": (
+                    "Fan Bank 1 and Fan Bank 2 motors have seized. Cooling capacity "
+                    "reduced to ONAN (natural convection only). "
+                    "Six-stage cascade sequence has begun: cooling failure → hot spot → "
+                    "oil/paper degradation → partial discharge → arcing → relay trip. "
+                    "IMMEDIATE intervention required to prevent terminal failure."
+                ),
+                "sensor_ids": ["FAN_BANK_1", "FAN_BANK_2", "TOP_OIL_TEMP", "WINDING_TEMP"],
+                "actions": [
+                    "IMMEDIATE: Dispatch maintenance crew — inspect both fan bank motors",
+                    "IMMEDIATE: Reduce transformer load to 40% or below",
+                    "Prepare for emergency load transfer if temperature exceeds 95°C top oil",
+                    "Initiate DGA oil sampling — capture pre-fault baseline",
+                    "Alert transformer engineer and operations manager NOW",
+                ],
+            },
         }
 
         alert_info = _SCENARIO_START_ALERTS.get(scenario_id)
@@ -1136,6 +1210,8 @@ class SimulatorEngine:
             "cascade_duration_s": round(self._winding_critical_duration, 1),
             # Cumulative thermal fatigue (0.0–1.0) — persists across scenarios
             "thermal_fatigue_score": round(thermal_fatigue_score, 4),
+            # Terminal failure — protection relay operated, transformer offline
+            "terminal_failure": self._terminal_failure,
         }
         await self._fire_callbacks(self._scenario_callbacks, message)
 
@@ -1184,6 +1260,49 @@ class SimulatorEngine:
         logger.warning(
             "FAULT CASCADE triggered at sim_time=%.1f — thermal→arcing escalation active",
             self.sim_time,
+        )
+
+    async def _emit_terminal_failure_alert(self, timestamp: str) -> None:
+        """Emit CRITICAL terminal failure alert when protection relay operates.
+
+        This is the final, irreversible alert in the thermal_runaway cascade.
+        Physical basis: differential relay + Buchholz relay both operated simultaneously.
+
+        Args:
+            timestamp: ISO 8601 UTC timestamp string.
+        """
+        self._alert_seq += 1
+        alert = AlertSchema(
+            id=self._alert_seq,
+            timestamp=timestamp,
+            severity="CRITICAL",
+            title="PROTECTION RELAY OPERATED — TRANSFORMER TRIPPED",
+            description=(
+                "Differential relay and Buchholz relay operated simultaneously. "
+                "Inter-winding arcing caused instantaneous overcurrent. "
+                "Unit de-energised. LOAD_CURRENT = 0. Do not re-energise "
+                "without full internal inspection, DGA analysis, and engineering assessment."
+            ),
+            source="THRESHOLD",
+            sensor_ids=["LOAD_CURRENT", "WINDING_TEMP", "DGA_C2H2", "DGA_H2", "OIL_DIELECTRIC"],
+            failure_mode_id="FM-003",
+            recommended_actions=[
+                "Confirm breaker open; lock-out/tag-out (LOTO) before approach",
+                "Capture DGA oil sample immediately (gases freeze at current levels)",
+                "Notify engineering — do NOT re-energise without IEC 60076-7 post-fault assessment",
+                "Initiate insurance claim; schedule internal visual inspection",
+                "Coordinate with grid operator for load transfer to standby transformer",
+            ],
+            acknowledged=False,
+            acknowledged_at=None,
+            sim_time=self.sim_time,
+        )
+        message = {"type": "alert", "alert": alert.model_dump()}
+        await self._fire_callbacks(self._alert_callbacks, message)
+        for cb in self._persist_callbacks:
+            await cb({"type": "persist_alert", "alert": alert})
+        logger.critical(
+            "TERMINAL FAILURE ALERT emitted at sim_time=%.1f", self.sim_time
         )
 
     def _get_sensor_value_and_status(self, sensor_id: str) -> tuple[float, str]:

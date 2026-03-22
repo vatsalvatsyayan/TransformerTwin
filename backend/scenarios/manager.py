@@ -15,6 +15,7 @@ from scenarios.hot_spot import HotSpotScenario
 from scenarios.normal import NormalScenario
 from scenarios.partial_discharge import PartialDischargeScenario
 from scenarios.paper_degradation import PaperDegradationScenario
+from scenarios.thermal_runaway import ThermalRunawayScenario
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ SCENARIO_REGISTRY: dict[str, type[BaseScenario]] = {
     "cooling_failure": CoolingFailureScenario,
     "partial_discharge": PartialDischargeScenario,
     "paper_degradation": PaperDegradationScenario,
+    "thermal_runaway": ThermalRunawayScenario,
 }
 
 
