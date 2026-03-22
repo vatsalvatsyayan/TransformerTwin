@@ -475,3 +475,72 @@ DECISION_RISK_HIGH: float = 0.70
 
 # Hours of remaining useful life below which "act now" recommendation fires
 DECISION_ACT_NOW_THRESHOLD_HRS: float = 72.0
+
+# ---------------------------------------------------------------------------
+# Fault Cascade — thermal-to-arcing escalation
+#
+# If winding temperature stays at or above WINDING_CRITICAL (120°C) during
+# an active fault scenario for CASCADE_ARCING_TRIGGER_S simulation-seconds
+# without operator intervention, the simulation adds arcing-signature gases.
+# Physical basis: sustained overtemperature causes insulation breakdown →
+# electrical discharge → C2H2 and H2 generation (IEC 60599 D1/D2 signatures).
+# ---------------------------------------------------------------------------
+
+# Sim-seconds of sustained CRITICAL winding temp before arcing cascade triggers.
+# 5 sim-minutes is realistic for localized insulation tracking to begin.
+CASCADE_ARCING_TRIGGER_S: float = 300.0
+
+# Additional C2H2 injection rate (ppm/sim-second) when cascade is active.
+# Ramps from 0 to full rate over CASCADE_ARCING_RAMP_S seconds.
+CASCADE_C2H2_RATE_PPM_PER_S: float = 0.025
+
+# Additional H2 injection rate (ppm/sim-second) — arcing produces H2 as primary gas.
+CASCADE_H2_RATE_PPM_PER_S: float = 0.060
+
+# Additional CH4 rate — secondary arcing gas.
+CASCADE_CH4_RATE_PPM_PER_S: float = 0.010
+
+# Ramp time for cascade to reach full rate (sim-seconds after trigger).
+CASCADE_ARCING_RAMP_S: float = 600.0
+
+# ---------------------------------------------------------------------------
+# Thermal fatigue — cumulative insulation aging from sustained overtemperature
+#
+# Real transformers age irreversibly when winding temperature exceeds the
+# IEC 60076-7 reference (98°C). We track the "degree-hours above reference"
+# as a proxy for accelerated insulation aging. This makes faults leave a
+# PERMANENT mark on transformer health — it never fully recovers.
+# ---------------------------------------------------------------------------
+
+# Start accumulating fatigue when winding exceeds WARNING threshold (°C).
+FATIGUE_ONSET_THRESHOLD_C: float = 105.0
+
+# Degree-hours above onset threshold required to reach fatigue_score = 1.0.
+# A transformer at 130°C (+25°C above onset) for 40 sim-hours = 1000 degree-hours.
+# This represents severe life reduction (IEC 60076-7 Annex A).
+FATIGUE_FULL_DAMAGE_DEGREE_HOURS: float = 1000.0
+
+# ---------------------------------------------------------------------------
+# Prognostics — health trajectory prediction
+# ---------------------------------------------------------------------------
+
+# Number of health score samples to retain for degradation rate computation.
+# At the thermal tick rate (every 5 sim-seconds), this covers 100 × 5 = 500 sim-sec.
+PROGNOSTICS_HISTORY_LEN: int = 100
+
+# Minimum history points needed before slope computation is reliable.
+PROGNOSTICS_MIN_HISTORY_POINTS: int = 8
+
+# Health score thresholds for time-to-event projection (matches HealthStatusLabel)
+PROGNOSTICS_WARNING_THRESHOLD: float = 60.0   # Below GOOD (80) but above FAIR
+PROGNOSTICS_CRITICAL_THRESHOLD: float = 40.0  # POOR threshold — immediate action
+
+# Projection horizon in simulation hours (how far ahead to project).
+PROGNOSTICS_HORIZON_SIM_HRS: float = 72.0
+
+# Intervention load fraction for "70% load reduction" scenario in projections.
+PROGNOSTICS_INTERVENTION_LOAD_FRACTION: float = 0.70
+
+# Health recovery rate (pts/sim-hour) when load is reduced to 70%.
+# Conservative estimate: cooling improves, DGA slows, temperatures drop.
+PROGNOSTICS_INTERVENTION_RECOVERY_RATE_PER_HR: float = 2.0

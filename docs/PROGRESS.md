@@ -1,11 +1,59 @@
 # TransformerTwin — Progress Tracker
 
 > **This is a living document.** Update after every work session.
-> Last updated: 2026-03-21 (Session 13 — Operator Controls, Speed Fix, Health→3D Highlight)
+> Last updated: 2026-03-21 (Session 14 — Fault Cascade, Thermal Fatigue, Prognostics Engine)
 
 ---
 
-## Current Status: 🟢 Session 13 Complete — Operator Controls, Speed 100×/200× fixed, Health→3D Highlight
+## Current Status: 🟢 Session 14 Complete — Fault Cascade, Thermal Fatigue, Prognostics Engine
+
+### Session 14 Additions (2026-03-21)
+
+This session adds the "secret sauce" that makes TransformerTwin feel like a real digital twin rather than a monitoring dashboard: **emergent physics, irreversible damage, and predictive capability**.
+
+#### Feature: Automatic Fault Cascade (Thermal→Arcing)
+When a fault scenario is running and winding temperature stays at CRITICAL (≥120°C) for more than 5 simulated minutes, the system organically escalates to arcing — without any operator intervention:
+- **`backend/config.py`**: Added `CASCADE_ARCING_TRIGGER_S=300.0`, `CASCADE_C2H2_RATE_PPM_PER_S`, `CASCADE_H2_RATE_PPM_PER_S`, `CASCADE_CH4_RATE_PPM_PER_S`, `CASCADE_ARCING_RAMP_S=600.0`
+- **`backend/simulator/engine.py`**: Tracks `_winding_critical_duration` per tick; once threshold exceeded, injects escalating C₂H₂+H₂ DGA rates via `dga_mods`; emits one-time CRITICAL alert "CASCADE FAILURE: Thermal→Arcing Escalation"; broadcasts `cascade_triggered`, `cascade_duration_s` in `scenario_update` WebSocket messages
+- **Frontend**: `cascadeTriggered` state in store (set via `updateScenario`); `CascadeBanner` in `ScenarioProgressBar.tsx` (red banner at top of tab area); flashing red emergency section in `DecisionPanel.tsx`
+
+#### Feature: Thermal Fatigue Tracking (Irreversible Insulation Aging)
+Cumulative degree-hours above 105°C (the insulation onset threshold) that never reset — modeling permanent insulation damage:
+- **`backend/config.py`**: Added `FATIGUE_ONSET_THRESHOLD_C=105.0`, `FATIGUE_FULL_DAMAGE_DEGREE_HOURS=1000.0`
+- **`backend/simulator/engine.py`**: `_thermal_stress_integral` accumulates `(winding_temp - 105°C) × dt_hr` each tick; exposed as `thermal_fatigue_score` property (0.0–1.0); broadcast in `scenario_update`
+- **Frontend**: `thermalFatigueScore` in store; `ThermalFatigueBar` in `PrognosticsWidget.tsx` showing cumulative % with label (Negligible/Low/Moderate/High/Severe) and description
+
+#### Feature: Prognostics Engine — Time-to-Failure Prediction
+The system now predicts the future: how long until WARNING and CRITICAL thresholds are breached, and what intervention would buy:
+- **`backend/analytics/prognostics.py`** (NEW): `PrognosticsEngine.compute()` runs linear regression on health score history → degradation rate (pts/sim-hr), trend (RAPIDLY_DEGRADING/DEGRADING/STABLE/IMPROVING), time-to-WARNING (health <60), time-to-CRITICAL (health <40), projected health at 24h/48h/72h under no-action and 70%-load intervention
+- **`backend/config.py`**: Added `PROGNOSTICS_HISTORY_LEN=100`, `PROGNOSTICS_MIN_HISTORY_POINTS=8`, warning/critical thresholds, horizon, intervention constants
+- **`backend/api/routes_prognostics.py`** (NEW): `GET /api/prognostics` endpoint
+- **`backend/main.py`**: Registered `routes_prognostics`
+- **`frontend/src/types/prognostics.ts`** (NEW): Full TypeScript types for `PrognosticsResponse`, `ThermalFatigue`, `ProjectedHealth`, `InterventionProjection`
+- **`frontend/src/lib/api.ts`**: Added `getPrognostics()`
+- **`frontend/src/hooks/useApi.ts`**: Added `fetchPrognostics()`
+- **`frontend/src/store/index.ts`**: Added `prognostics` state + `setPrognostics` action
+- **`frontend/src/App.tsx`**: Initial fetch + 5s polling for prognostics
+
+#### Feature: PrognosticsWidget
+New `frontend/src/components/panels/PrognosticsWidget.tsx` with:
+- Degradation rate display (pts/sim-hr, color-coded by severity)
+- Time-to-WARNING and Time-to-CRITICAL countdowns
+- 3-column projected health bars (24h/48h/72h) comparing no-action vs 70%-load intervention
+- Thermal fatigue progress bar
+- Urgency-based border color (red for CRITICAL/EMERGENCY, orange for HIGH, yellow for MEDIUM)
+- Embedded in Decision tab between Risk Assessment and Recommended Action
+
+#### Enhancement: FMEACard Evidence Chain Visualization
+`frontend/src/components/panels/FMEACard.tsx` rewritten:
+- Matched evidence renders as a **visual causal chain** with connecting vertical line, node dots, and sensor value badges
+- Unmatched conditions shown dimly below
+- Confidence label badge added to header row alongside failure mode ID
+- Match score progress bar always visible under the header (red/orange/yellow)
+- Affected components rendered as monospace tag badges
+- Metadata row (severity + development time) above recommended actions
+
+All tests still pass: 28/28 backend, 125/125 frontend. Frontend TypeScript build clean.
 
 ### Session 13 Additions (2026-03-21)
 
@@ -375,4 +423,6 @@ Target: Vitest + React Testing Library — per CLAUDE.md spec (was the only unim
 | 2026-03-21 | 7 | Visual QA via Playwright MCP. Ran full 15-section TEST_PLAN.md. Found and fixed: DGA+FMEA never fetched (added REST polling in App.tsx + useApi.ts), FAN_BANK showing "0.0" instead of ON/OFF (SensorRow.tsx), Duval zone labels outside triangle (centroid Y sign bug in DuvalTriangle.tsx), speed button active state not visible (added ring highlight), What-If missing cooling energy row (added card to WhatIfPanel.tsx), FMEA/Alert empty states had no icons (added SVG icons). All fixes verified with screenshots. | Frontend unit tests |
 | 2026-03-21 | 8 | Phase 6: Frontend unit tests. Installed Vitest, configured vite.config.ts. Wrote 3 test files (125 tests total): duval-geometry.test.ts (53 — coord transforms, zone classification per IEC 60599), formatters.test.ts (35 — all format functions), store.test.ts (37 — actions, ring buffer, health labels, alert dedup, DGA trail cap). All 125/125 pass. Frontend build still clean. | Project fully complete |
 | 2026-03-21 | 9 | Comprehensive Playwright MCP QA of all 12 feature areas. Found and fixed 3 critical bugs: (1) HealthGauge + HealthBreakdown never rendered — added to TabContainer as always-visible strip; (2) anomaly detector min_std floor too small (1e-9) causing 1400+ alert flood — fixed to 1% of sensor range; (3) historical playback snapshot route not registered because backend was started without --reload before route was added — restarted backend. All features now verified: WebSocket, header controls, 3D model, 21 sensors + sparklines, health gauge/breakdown, DGA/Duval Triangle, FMEA, What-If, alerts, hot-spot scenario, arcing scenario, playback scrubber. ADR-019, ADR-020 logged. ISSUE-017, ISSUE-018, ISSUE-019 resolved. | Project fully demo-ready |
-| 2026-03-21 | 12 | Decision Support System. Added 100×/200× speed options. Added per-sensor recommended_actions to anomaly alerts. Created DecisionEngine (risk, RUL, economic impact, runbooks) + GET /api/decision + DecisionPanel frontend tab. Decision panel shows: risk assessment (5-dot visual), recommended action with deadline, 3-scenario economic impact table ($16k now vs $3.8M failure), 8 operator runbooks with interactive checkboxes. Frontend build clean (tsc + vite). Backend imports verified. | Deploy and demo |
+| 2026-03-21 | 12 | Decision Support System. Added 100×/200× speed options. Added per-sensor recommended_actions to anomaly alerts. Created DecisionEngine (risk, RUL, economic impact, runbooks) + GET /api/decision + DecisionPanel frontend tab. Decision panel shows: risk assessment (5-dot visual), recommended action with deadline, 3-scenario economic impact table ($16k now vs $3.8M failure), 8 operator runbooks with interactive checkboxes. Frontend build clean (tsc + vite). Backend imports verified. | Session 13 |
+| 2026-03-21 | 13 | Operator Controls + Speed 200× fix + Health→3D highlight. SpeedUpdateRequestSchema le=60→200. Health breakdown rows clickable, selected component highlights cyan in 3D model via useHealthColor. New routes_operator.py (POST /api/operator/actions, GET /api/operator/status). Engine applies load/cooling overrides before physics. DecisionPanel: Operator Controls section (Load/Cooling buttons) + active overrides green banner. 28/28 + 125/125 tests. | Session 14 |
+| 2026-03-21 | 14 | Fault Cascade + Thermal Fatigue + Prognostics Engine. Engine gains cascade tracking (_winding_critical_duration → injects C₂H₂/H₂ DGA after 5 sim-min CRITICAL), thermal stress integral (_thermal_stress_integral → fatigue_score 0–1). New analytics/prognostics.py: linear regression on health history → degradation rate, time-to-warning/critical, 24h/48h/72h projections. New GET /api/prognostics. New PrognosticsWidget in Decision tab. FMEACard: visual causal evidence chain. ScenarioProgressBar: cascade emergency banner. Frontend build clean. | Deploy and demo |

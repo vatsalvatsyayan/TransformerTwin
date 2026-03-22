@@ -3,6 +3,19 @@
 import { memo } from 'react'
 import { useStore } from '../../store'
 
+// ─── Cascade Emergency Banner ─────────────────────────────────────────────────
+
+function CascadeBanner() {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-red-950/70 border-b border-red-700/60">
+      <svg className="w-3 h-3 text-red-400 flex-shrink-0 animate-pulse" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+      <span className="text-[10px] font-bold text-red-300 uppercase tracking-wide">CASCADE FAILURE — Thermal→Arcing Escalation Active</span>
+    </div>
+  )
+}
+
 // Color tier thresholds by progress % (early → mid → late stage)
 function getTierClasses(pct: number): { text: string; bar: string; border: string; bg: string } {
   if (pct >= 67) {
@@ -34,36 +47,43 @@ export const ScenarioProgressBar = memo(function ScenarioProgressBar() {
   const scenarioName = useStore((s) => s.scenarioName)
   const stage = useStore((s) => s.stage)
   const progressPercent = useStore((s) => s.progressPercent)
+  const cascadeTriggered = useStore((s) => s.cascadeTriggered)
 
-  if (activeScenario === 'normal') return null
+  const isActive = activeScenario !== 'normal'
+  if (!isActive && !cascadeTriggered) return null
 
   const tier = getTierClasses(progressPercent)
 
   return (
-    <div className={`px-3 py-2.5 border-b ${tier.border} ${tier.bg} flex-shrink-0`}>
-      {/* Badge row */}
-      <div className="flex items-center justify-between mb-1">
-        <span className={`text-[9px] font-bold uppercase tracking-widest ${tier.text}`}>
-          ⚡ Fault Simulation Active
-        </span>
-        <span className="text-[10px] text-slate-400 tabular-nums">
-          {progressPercent.toFixed(0)}%
-        </span>
-      </div>
+    <div className="flex-shrink-0">
+      {cascadeTriggered && <CascadeBanner />}
+      {isActive && (
+        <div className={`px-3 py-2.5 border-b ${tier.border} ${tier.bg}`}>
+          {/* Badge row */}
+          <div className="flex items-center justify-between mb-1">
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${tier.text}`}>
+              ⚡ Fault Simulation Active
+            </span>
+            <span className="text-[10px] text-slate-400 tabular-nums">
+              {progressPercent.toFixed(0)}%
+            </span>
+          </div>
 
-      {/* Scenario name */}
-      <div className="text-xs font-semibold text-slate-100 truncate">{scenarioName}</div>
+          {/* Scenario name */}
+          <div className="text-xs font-semibold text-slate-100 truncate">{scenarioName}</div>
 
-      {/* Stage description */}
-      <div className="text-[10px] text-slate-400 mt-0.5 truncate">{stage}</div>
+          {/* Stage description */}
+          <div className="text-[10px] text-slate-400 mt-0.5 truncate">{stage}</div>
 
-      {/* Progress bar */}
-      <div className="mt-2 h-1 bg-slate-700/60 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${tier.bar} rounded-full transition-all duration-1000`}
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
+          {/* Progress bar */}
+          <div className="mt-2 h-1 bg-slate-700/60 rounded-full overflow-hidden">
+            <div
+              className={`h-full ${tier.bar} rounded-full transition-all duration-1000`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 })

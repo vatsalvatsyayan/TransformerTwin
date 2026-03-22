@@ -25,6 +25,14 @@ from config import (
     EQUIPMENT_SENSOR_IDS,
     DIAGNOSTIC_SENSOR_IDS,
     HEALTH_UPDATE_THRESHOLD,
+    CASCADE_ARCING_TRIGGER_S,
+    CASCADE_C2H2_RATE_PPM_PER_S,
+    CASCADE_H2_RATE_PPM_PER_S,
+    CASCADE_CH4_RATE_PPM_PER_S,
+    CASCADE_ARCING_RAMP_S,
+    FATIGUE_ONSET_THRESHOLD_C,
+    FATIGUE_FULL_DAMAGE_DEGREE_HOURS,
+    PROGNOSTICS_HISTORY_LEN,
 )
 from models.schemas import TransformerState, AlertSchema
 from scenarios.manager import ScenarioManager
@@ -251,6 +259,23 @@ class SimulatorEngine:
         self.operator_load_override: float | None = None
         self.operator_cooling_override: str | None = None
 
+        # --- Fault Cascade tracking ---
+        # Accumulates sim-seconds of sustained CRITICAL winding temp during active fault.
+        # When this exceeds CASCADE_ARCING_TRIGGER_S, arcing gases are injected.
+        self._winding_critical_duration: float = 0.0
+
+        # True once the cascade has triggered (to emit the alert exactly once).
+        self._cascade_triggered: bool = False
+
+        # --- Thermal Fatigue tracking ---
+        # Accumulates degree-hours of winding temp above FATIGUE_ONSET_THRESHOLD_C.
+        # Represents irreversible insulation aging. Persists across scenario boundaries.
+        self._thermal_stress_integral: float = 0.0  # degree-hours above onset threshold
+
+        # --- Prognostics: rolling health score history ---
+        # Stores (sim_time, health_score) tuples for degradation rate computation.
+        self._health_score_history: deque[tuple[float, float]] = deque(maxlen=PROGNOSTICS_HISTORY_LEN)
+
         # Callbacks registered by the WebSocket handler / persistence layer
         self._sensor_callbacks: list = []
         self._health_callbacks: list = []
@@ -325,6 +350,23 @@ class SimulatorEngine:
             Copy of current state.
         """
         return self.state.model_copy()
+
+    @property
+    def thermal_fatigue_score(self) -> float:
+        """Normalised thermal fatigue (0.0–1.0). Persists across scenarios.
+
+        Returns:
+            Float in [0.0, 1.0] where 1.0 represents full insulation fatigue.
+        """
+        return min(1.0, self._thermal_stress_integral / max(1.0, FATIGUE_FULL_DAMAGE_DEGREE_HOURS))
+
+    def get_health_history(self) -> list[tuple[float, float]]:
+        """Return recent (sim_time, health_score) history for prognostics.
+
+        Returns:
+            List of (sim_time_s, health_score) tuples, oldest first.
+        """
+        return list(self._health_score_history)
 
     # ------------------------------------------------------------------
     # Async run loop
@@ -403,6 +445,37 @@ class SimulatorEngine:
             cooling_mode=cooling_mode,
             winding_delta=winding_delta,
         )
+
+        # --- 5b. Fault Cascade: if winding stays CRITICAL during active fault,
+        #           inject arcing-signature gases (C2H2, H2) on top of scenario mods.
+        #           Physical basis: sustained insulation overtemperature → tracking/
+        #           electrical discharge → arcing precursors begin forming.
+        active_fault = scenario.scenario_id != "normal"
+        winding_now = thermal.winding_temp + winding_delta  # effective winding temp
+        winding_critical_thresh = SENSOR_THRESHOLDS["WINDING_TEMP"][2]  # 120°C
+
+        if active_fault and winding_now >= winding_critical_thresh:
+            self._winding_critical_duration += dt_s
+        elif not active_fault:
+            # Reset when scenario ends; keep value if fault active but temp temporarily drops
+            self._winding_critical_duration = max(0.0, self._winding_critical_duration - dt_s * 0.5)
+        # If active fault but winding below critical — slowly decay duration (could cool)
+        elif active_fault and winding_now < winding_critical_thresh:
+            self._winding_critical_duration = max(0.0, self._winding_critical_duration - dt_s * 2.0)
+
+        # Apply cascade DGA boost when trigger exceeded
+        if self._winding_critical_duration >= CASCADE_ARCING_TRIGGER_S:
+            excess_s = self._winding_critical_duration - CASCADE_ARCING_TRIGGER_S
+            cascade_factor = min(1.0, excess_s / CASCADE_ARCING_RAMP_S)
+            dga_mods["DGA_C2H2"] = dga_mods.get("DGA_C2H2", 0.0) + CASCADE_C2H2_RATE_PPM_PER_S * cascade_factor
+            dga_mods["DGA_H2"]   = dga_mods.get("DGA_H2",   0.0) + CASCADE_H2_RATE_PPM_PER_S   * cascade_factor
+            dga_mods["DGA_CH4"]  = dga_mods.get("DGA_CH4",  0.0) + CASCADE_CH4_RATE_PPM_PER_S  * cascade_factor
+
+        # --- 5c. Thermal Fatigue: accumulate degree-hours above onset threshold ---
+        if winding_now >= FATIGUE_ONSET_THRESHOLD_C:
+            # Convert sim-seconds to hours; accumulate excess degree-hours
+            degree_excess = winding_now - FATIGUE_ONSET_THRESHOLD_C
+            self._thermal_stress_integral += degree_excess * (dt_s / 3600.0)
 
         # --- 6. DGA model ---
         dga = self.dga_model.tick(
@@ -519,6 +592,19 @@ class SimulatorEngine:
             await self._emit_sensor_group("diagnostic", now_iso)
             self._last_diag_emit = self.sim_time
 
+        # --- 10b. Cascade alert: emit once when arcing cascade first triggers ---
+        cascade_just_triggered = (
+            self._winding_critical_duration >= CASCADE_ARCING_TRIGGER_S
+            and not self._cascade_triggered
+        )
+        if cascade_just_triggered:
+            self._cascade_triggered = True
+            await self._emit_cascade_alert(now_iso)
+
+        # Reset cascade flag when scenario ends (so it can re-trigger on next fault)
+        if not active_fault and self._winding_critical_duration < CASCADE_ARCING_TRIGGER_S:
+            self._cascade_triggered = False
+
         # --- 11. FMEA + Health score on every thermal tick ---
         if thermal_due:
             all_anomalies = self.latest_anomalies
@@ -533,6 +619,9 @@ class SimulatorEngine:
                 anomalies=all_anomalies,
             )
             self.latest_health_result = health_result
+
+            # Record health score history for prognostics degradation rate computation
+            self._health_score_history.append((self.sim_time, health_result["overall_score"]))
 
             # Emit FMEA alerts when confidence escalates
             active_fm_ids: set[str] = set()
@@ -820,6 +909,10 @@ class SimulatorEngine:
             timestamp: ISO 8601 UTC timestamp string (unused but kept for symmetry).
         """
         scenario = self.scenario_manager.active_scenario
+        thermal_fatigue_score = min(
+            1.0,
+            self._thermal_stress_integral / max(1.0, FATIGUE_FULL_DAMAGE_DEGREE_HOURS),
+        )
         message = {
             "type": "scenario_update",
             "scenario_id": scenario.scenario_id,
@@ -827,8 +920,60 @@ class SimulatorEngine:
             "stage": scenario.get_current_stage(),
             "progress_percent": scenario.progress_percent,
             "elapsed_sim_time": scenario.elapsed_sim_time,
+            # Cascade state — frontend shows urgent arcing warning when true
+            "cascade_triggered": self._cascade_triggered,
+            "cascade_duration_s": round(self._winding_critical_duration, 1),
+            # Cumulative thermal fatigue (0.0–1.0) — persists across scenarios
+            "thermal_fatigue_score": round(thermal_fatigue_score, 4),
         }
         await self._fire_callbacks(self._scenario_callbacks, message)
+
+    async def _emit_cascade_alert(self, timestamp: str) -> None:
+        """Emit a CRITICAL alert when the thermal→arcing cascade first triggers.
+
+        This is the signal that unchecked thermal fault has begun producing
+        electrical discharge signatures — the fault has escalated.
+
+        Args:
+            timestamp: ISO 8601 UTC timestamp string.
+        """
+        self._alert_seq += 1
+        alert_dict = {
+            "type": "alert",
+            "alert": {
+                "id": self._alert_seq,
+                "timestamp": timestamp,
+                "severity": "CRITICAL",
+                "title": "FAULT CASCADE: Thermal Stress → Arcing Signature Detected",
+                "description": (
+                    f"Winding temperature has remained at CRITICAL level for "
+                    f"{CASCADE_ARCING_TRIGGER_S / 60:.0f} sim-minutes without resolution. "
+                    "Sustained insulation overtemperature has triggered electrical "
+                    "discharge precursors — acetylene (C2H2) and hydrogen (H2) now "
+                    "accumulating. Duval Triangle will move toward discharge zones (D1/D2). "
+                    "IMMEDIATE operator intervention required."
+                ),
+                "source": "FMEA_ENGINE",
+                "sensor_ids": ["WINDING_TEMP", "DGA_C2H2", "DGA_H2"],
+                "failure_mode_id": "FM-003",
+                "recommended_actions": [
+                    "IMMEDIATE: Reduce load to 40% or below",
+                    "IMMEDIATE: Upgrade cooling to OFAF if available",
+                    "Verify Buchholz relay — check for gas accumulation",
+                    "Initiate emergency DGA oil sample within 1 hour",
+                    "Prepare for emergency controlled shutdown if C2H2 > 50 ppm",
+                    "Contact transformer engineer and operations manager now",
+                ],
+                "acknowledged": False,
+                "acknowledged_at": None,
+                "sim_time": self.sim_time,
+            },
+        }
+        await self._fire_callbacks(self._alert_callbacks, alert_dict)
+        logger.warning(
+            "FAULT CASCADE triggered at sim_time=%.1f — thermal→arcing escalation active",
+            self.sim_time,
+        )
 
     def _get_sensor_value_and_status(self, sensor_id: str) -> tuple[float, str]:
         """Read current value for a sensor from state and compute its status.

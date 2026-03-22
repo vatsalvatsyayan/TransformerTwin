@@ -5,6 +5,7 @@ import { useStore } from '../../store'
 import { api } from '../../lib/api'
 import type { RiskLevel, OperatorRunbook, EconomicImpact } from '../../types/decision'
 import type { OperatorAction } from '../../types/operator'
+import { PrognosticsWidget } from './PrognosticsWidget'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -375,6 +376,7 @@ function OperatorControls() {
 
 export const DecisionPanel = memo(function DecisionPanel() {
   const decision = useStore((s) => s.decision)
+  const cascadeTriggered = useStore((s) => s.cascadeTriggered)
 
   return (
     <div className="p-3 space-y-4 text-xs">
@@ -399,6 +401,24 @@ export const DecisionPanel = memo(function DecisionPanel() {
 
             return (
               <>
+                {/* ── Cascade Emergency Banner ── */}
+                {cascadeTriggered && (
+                  <section>
+                    <div className="rounded-lg border border-red-500 bg-red-950/50 px-3 py-2.5 flex items-start gap-2.5 animate-pulse">
+                      <svg className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <div>
+                        <p className="text-xs font-bold text-red-300 mb-0.5">CASCADE FAILURE IN PROGRESS</p>
+                        <p className="text-[10px] text-red-400/80 leading-relaxed">
+                          Sustained critical winding temperature has triggered thermal→arcing cascade.
+                          C₂H₂ and H₂ are escalating. Immediate de-energization may be required.
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
                 {/* ── Risk Assessment ── */}
                 <section>
                   <div className="flex items-center justify-between mb-2">
@@ -410,6 +430,12 @@ export const DecisionPanel = memo(function DecisionPanel() {
                     )}
                   </div>
                   <RiskBadge level={risk_level} score={risk_score} description={risk_description} />
+                </section>
+
+                {/* ── Live Prognosis ── */}
+                <section>
+                  <h3 className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Live Prognosis</h3>
+                  <PrognosticsWidget />
                 </section>
 
                 {/* ── Decision Recommendation ── */}

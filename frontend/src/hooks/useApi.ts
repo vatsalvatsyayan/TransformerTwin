@@ -74,3 +74,10 @@ export async function fetchOperatorStatus(): Promise<void> {
   const store = useStore.getState()
   store.setOperatorStatus(data)
 }
+
+/** Fetches prognostics (health trajectory, time-to-failure, thermal fatigue) and stores it */
+export async function fetchPrognostics(): Promise<void> {
+  const data = await api.getPrognostics()
+  const store = useStore.getState()
+  store.setPrognostics(data)
+}

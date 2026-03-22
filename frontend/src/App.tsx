@@ -7,7 +7,7 @@ import { MainLayout } from './components/layout/MainLayout'
 import { BottomTimeline } from './components/layout/BottomTimeline'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useStore } from './store'
-import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA, fetchDecision, fetchOperatorStatus } from './hooks/useApi'
+import { fetchCurrentSensors, fetchHealth, fetchDGAAnalysis, fetchFMEA, fetchDecision, fetchOperatorStatus, fetchPrognostics } from './hooks/useApi'
 
 export default function App() {
   // Establish WebSocket connection (reconnects automatically)
@@ -26,6 +26,7 @@ export default function App() {
     fetchDecision().catch((err: unknown) => console.warn('[Init] decision fetch failed:', err))
     fetchFMEA().catch((err: unknown) => console.warn('[Init] FMEA fetch failed:', err))
     fetchOperatorStatus().catch((err: unknown) => console.warn('[Init] operator status fetch failed:', err))
+    fetchPrognostics().catch((err: unknown) => console.warn('[Init] prognostics fetch failed:', err))
   }, [])
 
   // Poll DGA analysis and FMEA every 5s (not in WebSocket, so REST polling is needed)
@@ -35,6 +36,7 @@ export default function App() {
       fetchFMEA().catch(() => undefined)
       fetchDecision().catch(() => undefined)
       fetchOperatorStatus().catch(() => undefined)
+      fetchPrognostics().catch(() => undefined)
     }, 5000)
     return () => clearInterval(id)
   }, [])

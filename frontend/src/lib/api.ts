@@ -9,6 +9,7 @@ import type { SimulationRequest, SimulationResponse } from '../types/simulation'
 import type { DecisionResponse } from '../types/decision'
 import type { OperatorAction, OperatorStatus } from '../types/operator'
 import type { SensorId } from '../types/sensors'
+import type { PrognosticsResponse } from '../types/prognostics'
 
 const BASE_URL = 'http://localhost:8001'
 
@@ -100,4 +101,6 @@ export const api = {
     }),
 
   getOperatorStatus: () => request<OperatorStatus>('/api/operator/status'),
+
+  getPrognostics: () => request<PrognosticsResponse>('/api/prognostics'),
 }

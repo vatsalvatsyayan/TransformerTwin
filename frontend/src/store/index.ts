@@ -10,6 +10,7 @@ import type { ScenarioId } from '../types/scenario'
 import type { ConnectionState } from '../types/websocket'
 import type { DecisionResponse } from '../types/decision'
 import type { OperatorStatus } from '../types/operator'
+import type { PrognosticsResponse } from '../types/prognostics'
 
 /** Maximum history points kept per sensor in the in-memory ring buffer */
 export const SENSOR_HISTORY_BUFFER_SIZE = 720
@@ -46,6 +47,9 @@ export interface AppState {
   stage: string
   progressPercent: number
   elapsedSimTime: number
+  // Cascade: thermal→arcing escalation state (from scenario_update WS message)
+  cascadeTriggered: boolean
+  thermalFatigueScore: number
 
   // --- Connection ---
   connectionStatus: ConnectionState
@@ -58,6 +62,9 @@ export interface AppState {
 
   // --- Operator controls ---
   operatorStatus: OperatorStatus | null
+
+  // --- Prognostics ---
+  prognostics: PrognosticsResponse | null
 
   // --- Health component selection (drives 3D highlight) ---
   selectedHealthComponent: HealthComponentKey | null
@@ -92,6 +99,8 @@ export interface AppState {
     stage: string
     progress_percent: number
     elapsed_sim_time: number
+    cascade_triggered?: boolean
+    thermal_fatigue_score?: number
   }) => void
   setConnectionStatus: (status: ConnectionState) => void
   setSpeedMultiplier: (speed: number) => void
@@ -103,6 +112,7 @@ export interface AppState {
   setDecision: (decision: DecisionResponse) => void
   setOperatorStatus: (status: OperatorStatus) => void
   setSelectedHealthComponent: (key: HealthComponentKey | null) => void
+  setPrognostics: (prog: PrognosticsResponse) => void
 }
 
 export const useStore = create<AppState>()((set) => ({
@@ -125,12 +135,15 @@ export const useStore = create<AppState>()((set) => ({
   stage: 'Normal operation',
   progressPercent: 0,
   elapsedSimTime: 0,
+  cascadeTriggered: false,
+  thermalFatigueScore: 0,
   connectionStatus: 'disconnected',
   speedMultiplier: 1,
   simTime: 0,
   wallClockTime: null,
   decision: null,
   operatorStatus: null,
+  prognostics: null,
   selectedHealthComponent: null,
   mode: 'live',
   playbackPosition: null,
@@ -215,6 +228,8 @@ export const useStore = create<AppState>()((set) => ({
       stage: p.stage,
       progressPercent: p.progress_percent,
       elapsedSimTime: p.elapsed_sim_time,
+      cascadeTriggered: p.cascade_triggered ?? false,
+      thermalFatigueScore: p.thermal_fatigue_score ?? 0,
     }),
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
@@ -227,4 +242,5 @@ export const useStore = create<AppState>()((set) => ({
   setDecision: (decision) => set({ decision }),
   setOperatorStatus: (status) => set({ operatorStatus: status }),
   setSelectedHealthComponent: (key) => set({ selectedHealthComponent: key }),
+  setPrognostics: (prog) => set({ prognostics: prog }),
 }))
